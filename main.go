@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	ip_api "ip-api-go-pkg"
+	"ip-api-go-pkg"
 	"ip-api-proxy/ipAPI"
 	"log"
 	"net/http"
