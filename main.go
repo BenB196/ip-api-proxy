@@ -122,6 +122,13 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		//get key
+		keys, ok := r.URL.Query()["key"]
+		var key string
+		if len(keys) > 0 {
+			key = keys[0]
+		}
+
 		//Get ip address
 		ip := ipAPI.IPDNSRegexp.FindString(r.URL.Path)
 
@@ -150,7 +157,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//execute query
-		newLocation, err := ip_api.SingleQuery(query,"","") //TODO turn apiKey into a variable
+		newLocation, err := ip_api.SingleQuery(query,key,"")
 
 		if err != nil {
 			location.Status = "failed"
@@ -182,6 +189,79 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			http.Error(w,"400 POST requests only supported for /batch.",http.StatusBadRequest)
 			return
 		}
+
+		//check to make sure that there are only 1 or less / in URL
+		if strings.Count(r.URL.Path,"/") > 1 {
+			location.Status = "failed"
+			location.Message = "400 expected one (1) \"/\" but got more."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusNotFound)
+			return
+		}
+
+		//get fields values
+		fields, ok := r.URL.Query()["fields"]
+
+		if !ok && len(fields) > 0 {
+			location.Status = "failed"
+			location.Message = "400 invalid fields value."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
+		}
+
+		//get lang value
+		lang, ok := r.URL.Query()["lang"]
+
+		if !ok && len(lang) > 0 {
+			location.Status = "failed"
+			location.Message = "400 invalid lang value."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
+		}
+
+		//validate fields
+		validatedFields, err := ipAPI.ValidateFields(fields)
+
+		if err != nil {
+			location.Status = "failed"
+			location.Message = "400 " + err.Error()
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
+		}
+
+		//validate lang
+		var validatedLang string
+		if len(lang) > 0 {
+			validatedLang, err = ipAPI.ValidateLang(lang[0])
+
+			if err != nil {
+				location.Status = "failed"
+				location.Message = "400 " + err.Error()
+				jsonLocation, _ := json.Marshal(&location)
+				http.Error(w,string(jsonLocation),http.StatusBadRequest)
+				return
+			}
+		}
+
+		//get key
+		keys, ok := r.URL.Query()["key"]
+		var key string
+		if len(keys) > 0 {
+			key = keys[0]
+		}
+
+		log.Println(validatedFields)
+		log.Println(validatedLang)
+		log.Println(key)
+
+		//TODO get POST data
+
+		//TODO loop through post data and handle each ip query as a single query
+
+		//TODO return array of query results
 	default:
 		_, err := fmt.Fprintf(w, "Error, server only supports GET and POST requests.")
 		if err != nil {
