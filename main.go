@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"ip-api-go-pkg"
 	"ip-api-proxy/cache"
 	"ip-api-proxy/ipAPI"
@@ -98,14 +99,18 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//validate fields
-		validatedFields, err := ipAPI.ValidateFields(fields)
+		var validatedFields string
+		var err error
+		if len(fields) > 0 {
+			validatedFields, err = ipAPI.ValidateFields(fields[0])
 
-		if err != nil {
-			location.Status = "failed"
-			location.Message = "400 " + err.Error()
-			jsonLocation, _ := json.Marshal(&location)
-			http.Error(w,string(jsonLocation),http.StatusBadRequest)
-			return
+			if err != nil {
+				location.Status = "failed"
+				location.Message = "400 " + err.Error()
+				jsonLocation, _ := json.Marshal(&location)
+				http.Error(w,string(jsonLocation),http.StatusBadRequest)
+				return
+			}
 		}
 
 		//validate lang
@@ -138,7 +143,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		//If ip found in cache return cached value
 		if found {
 			log.Println("Found: " + ip + " in cache.")
-			jsonLocation, _ :=json.Marshal(location)
+			jsonLocation, err :=json.Marshal(location)
 			w.WriteHeader(http.StatusOK)
 			_, err = w.Write(jsonLocation)
 			if err != nil {
@@ -152,7 +157,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			Queries:[]ip_api.QueryIP{
 				{Query:ip},
 			},
-			Fields:ipAPI.AllowedAPIFields, //Execute query to IP API for all fields, handle field selection later
+			Fields:strings.Join(ipAPI.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
 			Lang:validatedLang,
 		}
 
@@ -222,14 +227,18 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//validate fields
-		validatedFields, err := ipAPI.ValidateFields(fields)
+		var validatedFields string
+		var err error
+		if len(fields) > 0 {
+			validatedFields, err = ipAPI.ValidateFields(fields[0])
 
-		if err != nil {
-			location.Status = "failed"
-			location.Message = "400 " + err.Error()
-			jsonLocation, _ := json.Marshal(&location)
-			http.Error(w,string(jsonLocation),http.StatusBadRequest)
-			return
+			if err != nil {
+				location.Status = "failed"
+				location.Message = "400 " + err.Error()
+				jsonLocation, _ := json.Marshal(&location)
+				http.Error(w,string(jsonLocation),http.StatusBadRequest)
+				return
+			}
 		}
 
 		//validate lang
@@ -253,15 +262,104 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			key = keys[0]
 		}
 
-		log.Println(validatedFields)
-		log.Println(validatedLang)
-		log.Println(key)
+		//Read body data
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			location.Status = "failed"
+			location.Message = "400 " + err.Error()
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
+		}
 
-		//TODO get POST data
+		//unmarshal request into slice
+		var queries []ip_api.QueryIP
+		err = json.Unmarshal(body,&queries)
+		if err != nil {
+			location.Status = "failed"
+			location.Message = "400 " + err.Error()
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
+		}
 
-		//TODO loop through post data and handle each ip query as a single query
+		//TODO delete
+		log.Println(queries)
 
-		//TODO return array of query results
+		var locations []ip_api.Location
+
+		//Loop through queries from post data and handle each query as a single query
+		//TODO goroutine?
+		for _, query := range queries {
+			//validate any sub fields
+			if query.Fields != "" {
+				validatedFields, err = ipAPI.ValidateFields(query.Fields)
+			}
+
+			//validate any sub langs
+			if query.Lang != "" {
+				validatedLang, err = ipAPI.ValidateLang(query.Lang)
+			}
+
+			//init location
+			var location ip_api.Location
+
+			//If err on sub fields or sub lang set as failed query status with err in message
+			if err != nil {
+				location.Status = "failed"
+				location.Message = "400 " + err.Error()
+			} else {
+				//Check cache for ip
+				location, found := cache.GetLocation(query.Query,validatedFields)
+
+				//If ip found in cache return cached value
+				if found {
+					log.Println("Found: " + query.Query + " in cache.")
+					//Append query to location list
+					locations = append(locations, location)
+				}
+
+				//execute query
+				if !found {
+					//Build query
+					queryStruct := ip_api.Query{
+						Queries:[]ip_api.QueryIP{
+							{Query:query.Query},
+						},
+						Fields:strings.Join(ipAPI.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
+						Lang:validatedLang,
+					}
+
+					location, err = ip_api.SingleQuery(queryStruct,key,"")
+
+					if err != nil {
+						location = ip_api.Location{}
+						location.Status = "failed"
+						location.Message = "400 " + err.Error()
+					}
+
+					//Add to cache if successful query
+					if location.Status == "success" {
+						log.Println("Added: " + query.Query + " to cache.")
+						cache.AddLocation(query.Query,location,10 * time.Second) //TODO turn duration into a variable
+						//Re-get query with specified fields
+						location, _ = cache.GetLocation(query.Query,validatedFields)
+					}
+
+					//Append query to location list
+					locations = append(locations, location)
+				}
+			}
+		}
+
+		//return query as an array
+		jsonLocations, _ := json.Marshal(&locations)
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(jsonLocations)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
 	default:
 		_, err := fmt.Fprintf(w, "Error, server only supports GET and POST requests.")
 		if err != nil {

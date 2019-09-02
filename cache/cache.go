@@ -3,6 +3,7 @@ package cache
 import (
 	"ip-api-go-pkg"
 	"ip-api-proxy/ipAPI"
+	"strings"
 	"time"
 )
 
@@ -14,7 +15,7 @@ type Record struct {
 var RecordCache = map[string]Record{}
 
 //TODO func to check cache for record
-func GetLocation(query string, fields []string) (ip_api.Location,bool) {
+func GetLocation(query string, fields string) (ip_api.Location,bool) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 	//Check if record exists in cache map
@@ -32,8 +33,9 @@ func GetLocation(query string, fields []string) (ip_api.Location,bool) {
 		if len(fields) == len(ipAPI.AllowedAPIFields) {
 			return record.Location, true
 		} else {
+			fieldSlice := strings.Split(fields,",")
 			//Loop through fields and set selected fields
-			for _, field := range fields {
+			for _, field := range fieldSlice {
 				switch field {
 				case "status":
 					location.Status = record.Location.Status
