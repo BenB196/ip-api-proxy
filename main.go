@@ -4,14 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"ip-api-go-pkg"
+	"ip-api-proxy/cache"
 	"ip-api-proxy/ipAPI"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 )
 
 func main()  {
 	http.HandleFunc("/",ipAIPProxy)
+
+	var clearCacheWg sync.WaitGroup
+
+	//Clear cache interval
+	clearCacheTimeTicker := time.NewTicker(10 * time.Second) //TODO turn this duration into a variable
+	clearCacheWg.Add(1)
+	go func() {
+		for {
+			select {
+			case <-clearCacheTimeTicker.C:
+				log.Println("Clearing Cache")
+				go cache.CleanUpCache()
+			}
+			defer clearCacheWg.Done()
+		}
+	}()
 
 	//Listen on port
 	log.Println("Starting server...")
@@ -79,7 +98,20 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		//Get ip address
 		ip := ipAPI.IPDNSRegexp.FindString(r.URL.Path)
 
-		//TODO this is where the cache should be checked to see if the IP is already cached
+		//Check cache for ip
+		location, found := cache.GetLocation(ip)
+
+		//If ip found in cache return cached value
+		if found {
+			log.Println("Found: " + ip + " in cache.")
+			jsonLocation, _ :=json.Marshal(location)
+			w.WriteHeader(http.StatusOK)
+			_, err = w.Write(jsonLocation)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return
+		}
 
 		//Build query
 		query := ip_api.Query{
@@ -91,19 +123,27 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//execute query
-		location, err := ip_api.SingleQuery(query,"","")
+		location, err = ip_api.SingleQuery(query,"","") //TODO turn apiKey into a variable
 
 		if err != nil {
 			http.Error(w,"400 " + err.Error(),http.StatusBadRequest)
 			return
 		}
 
-		//TODO add to cache if successful
+		//Add to cache if successful query
+		if location.Status == "success" {
+			log.Println("Added: " + ip + " to cache.")
+			cache.AddLocation(ip,location,10 * time.Second) //TODO turn duration into a variable
+		}
 
+		//return query
 		jsonLocation, _ := json.Marshal(&location)
-
-		log.Println(string(jsonLocation))
-
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(jsonLocation)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
 	case "POST":
 		//check to make sure that only batch end point is getting POST requests
 		if r.URL.Path != "/batch" {
