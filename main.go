@@ -43,9 +43,15 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 	//set content type
 	w.Header().Set("Content-Type","application/json")
 
+	//init location variable
+	location := ip_api.Location{}
+
 	//check to make sure only support sub pages are being used
 	if r.URL.Path != "/json/" && !strings.Contains(r.URL.Path,"/json/")  && r.URL.Path != "/batch" {
-		http.Error(w,"404 not found.",http.StatusNotFound)
+		location.Status = "failed"
+		location.Message = "404 not found."
+		jsonLocation, _ := json.Marshal(&location)
+		http.Error(w,string(jsonLocation),http.StatusNotFound)
 		return
 	}
 
@@ -53,13 +59,19 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		//Check to make sure that only json end point is getting GET requests
 		if r.URL.Path != "/json/" && !strings.Contains(r.URL.Path,"/json/") {
-			http.Error(w,"400 GET requests only supported for /json/.",http.StatusBadRequest)
+			location.Status = "failed"
+			location.Message = "400 GET requests only supported for /json/."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
 			return
 		}
 
 		//check to make sure that there are only 2 or less / in URL
 		if strings.Count(r.URL.Path,"/") > 2 {
-			http.Error(w,"400 expected one (1) or (2) \"/\" but got more.",http.StatusNotFound)
+			location.Status = "failed"
+			location.Message = "400 expected one (1) or (2) \"/\" but got more."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusNotFound)
 			return
 		}
 
@@ -67,7 +79,10 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		fields, ok := r.URL.Query()["fields"]
 
 		if !ok && len(fields) > 0 {
-			http.Error(w,"400 invalid fields value.",http.StatusBadRequest)
+			location.Status = "failed"
+			location.Message = "400 invalid fields value."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
 			return
 		}
 
@@ -75,7 +90,10 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		lang, ok := r.URL.Query()["lang"]
 
 		if !ok && len(lang) > 0 {
-			http.Error(w,"400 invalid lang value.",http.StatusBadRequest)
+			location.Status = "failed"
+			location.Message = "400 invalid lang value."
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
 			return
 		}
 
@@ -83,16 +101,25 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		validatedFields, err := ipAPI.ValidateFields(fields)
 
 		if err != nil {
-			http.Error(w,"400 " + err.Error(),http.StatusBadRequest)
+			location.Status = "failed"
+			location.Message = "400 " + err.Error()
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
 			return
 		}
 
 		//validate lang
-		validatedLang, err := ipAPI.ValidateLang(lang[0])
+		var validatedLang string
+		if len(lang) > 0 {
+			validatedLang, err = ipAPI.ValidateLang(lang[0])
 
-		if err != nil {
-			http.Error(w, "400 " + err.Error(),http.StatusBadRequest)
-			return
+			if err != nil {
+				location.Status = "failed"
+				location.Message = "400 " + err.Error()
+				jsonLocation, _ := json.Marshal(&location)
+				http.Error(w,string(jsonLocation),http.StatusBadRequest)
+				return
+			}
 		}
 
 		//Get ip address
@@ -123,23 +150,26 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//execute query
-		location, err = ip_api.SingleQuery(query,"","") //TODO turn apiKey into a variable
+		newLocation, err := ip_api.SingleQuery(query,"","") //TODO turn apiKey into a variable
 
 		if err != nil {
-			http.Error(w,"400 " + err.Error(),http.StatusBadRequest)
+			location.Status = "failed"
+			location.Message = "400 " + err.Error()
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
 			return
 		}
 
 		//Add to cache if successful query
-		if location.Status == "success" {
+		if newLocation.Status == "success" {
 			log.Println("Added: " + ip + " to cache.")
-			cache.AddLocation(ip,location,10 * time.Second) //TODO turn duration into a variable
+			cache.AddLocation(ip,newLocation,10 * time.Second) //TODO turn duration into a variable
 			//Re-get query with specified fields
 			location, _ = cache.GetLocation(ip,validatedFields)
 		}
 
 		//return query
-		jsonLocation, _ := json.Marshal(&location)
+		jsonLocation, _ := json.Marshal(&newLocation)
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(jsonLocation)
 		if err != nil {
