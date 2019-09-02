@@ -13,7 +13,7 @@ type Record struct {
 var RecordCache = map[string]Record{}
 
 //TODO func to check cache for record
-func GetLocation(query string) (ip_api.Location,bool) {
+func GetLocation(query string, fields []string) (ip_api.Location,bool) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 	//Check if record exists in cache map
@@ -24,8 +24,61 @@ func GetLocation(query string) (ip_api.Location,bool) {
 			delete(RecordCache,query)
 			return ip_api.Location{},false
 		}
+
+		//TODO return only the fields that were requested
+		location := ip_api.Location{}
+		
+		for _, field := range fields {
+			switch field {
+			case "status":
+				location.Status = record.Location.Status
+			case "message":
+				location.Message = record.Location.Message
+			case "continent":
+				location.Continent = record.Location.Continent
+			case "continentCode":
+				location.ContinentCode = record.Location.ContinentCode
+			case "country":
+				location.Country = record.Location.Country
+			case "countryCode":
+				location.CountryCode = record.Location.CountryCode
+			case "region":
+				location.Region = record.Location.Region
+			case "regionName":
+				location.RegionName = record.Location.RegionName
+			case "city":
+				location.City = record.Location.City
+			case "district":
+				location.District = record.Location.District
+			case "zip":
+				location.ZIP = record.Location.ZIP
+			case "lat":
+				location.Lat = record.Location.Lat
+			case "lon":
+				location.Lon = record.Location.Lon
+			case "timezone":
+				location.Timezone = record.Location.Timezone
+			case "isp":
+				location.ISP = record.Location.ISP
+			case "org":
+				location.Org = record.Location.Org
+			case "as":
+				location.AS = record.Location.AS
+			case "asname":
+				location.ASName = record.Location.ASName
+			case "reverse":
+				location.Reverse = record.Location.Reverse
+			case "mobile":
+				location.Mobile = record.Location.Mobile
+			case "proxy":
+				location.Proxy = record.Location.Proxy
+			case "query":
+				location.Query = record.Location.Query
+			}
+		}
+
 		//Return location
-		return record.Location, true
+		return location, true
 	}
 	//record not found in cache return false
 	return ip_api.Location{},false

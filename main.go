@@ -99,7 +99,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		ip := ipAPI.IPDNSRegexp.FindString(r.URL.Path)
 
 		//Check cache for ip
-		location, found := cache.GetLocation(ip)
+		location, found := cache.GetLocation(ip,validatedFields)
 
 		//If ip found in cache return cached value
 		if found {
@@ -118,7 +118,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			Queries:[]ip_api.QueryIP{
 				{Query:ip},
 			},
-			Fields:validatedFields,
+			Fields:ipAPI.AllowedAPIFields, //Execute query to IP API for all fields, handle field selection later
 			Lang:validatedLang,
 		}
 
@@ -134,6 +134,8 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		if location.Status == "success" {
 			log.Println("Added: " + ip + " to cache.")
 			cache.AddLocation(ip,location,10 * time.Second) //TODO turn duration into a variable
+			//Re-get query with specified fields
+			location, _ = cache.GetLocation(ip,validatedFields)
 		}
 
 		//return query
