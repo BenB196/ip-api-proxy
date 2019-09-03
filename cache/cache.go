@@ -1,8 +1,12 @@
 package cache
 
 import (
+	"encoding/gob"
+	"errors"
 	"ip-api-go-pkg"
 	"ip-api-proxy/ipAPI"
+	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -108,6 +112,7 @@ func AddLocation(query string,location ip_api.Location, expirationDuration time.
 
 //TODO func to remove records from cache after expire time
 func CleanUpCache() {
+	log.Println("Starting Cache Clean Up")
 	//set timezone
 	loc, _ := time.LoadLocation("UTC")
 
@@ -120,8 +125,78 @@ func CleanUpCache() {
 			delete(RecordCache,query)
 		}
 	}
+	log.Println("Finished Cache Clean Up")
 }
 
 //TODO func to write cache to file
+func WriteCache(writeLocation *string) {
+	log.Println("Starting Cache Write")
+	//create file name
+	fileName := *writeLocation + "cache.gob"
+
+	//create cache file
+	file, err := os.Create(fileName)
+
+	defer func() {
+		if err := file.Close(); err != nil {
+			panic(errors.New("error: closing file: " + fileName + " " + err.Error()))
+		}
+	}()
+
+	if err != nil {
+		panic(err)
+	}
+
+	//gob encoder
+	e := gob.NewEncoder(file)
+
+	//encode cache
+	err = e.Encode(RecordCache)
+
+	if err != nil {
+		panic(err)
+	}
+	log.Println("Finished Cache Write")
+}
 
 //TODO func to read cache from file
+func ReadCache(writeLocation *string) {
+	//create filename
+	fileName := *writeLocation + "cache.gob"
+
+	//read file data
+	cacheFile, err := os.Open(fileName)
+
+	if err != nil {
+		//If file does not exist create one
+		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
+			WriteCache(writeLocation)
+		} else {
+			panic(err)
+		}
+	} else {
+		defer func() {
+			if err := cacheFile.Close(); err != nil {
+				panic(errors.New("error: closing file: " + fileName + " " + err.Error()))
+			}
+		}()
+		//check if file size > 0
+		fstat, err := cacheFile.Stat()
+
+		if err != nil {
+			panic(err)
+		}
+
+		if fstat.Size() > 0 {
+			//create decode
+			cacheDecoder := gob.NewDecoder(cacheFile)
+
+			//decode cache data
+			err = cacheDecoder.Decode(&RecordCache)
+
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+}

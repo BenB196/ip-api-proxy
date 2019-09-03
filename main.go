@@ -49,7 +49,6 @@ func main()  {
 		for {
 			select {
 			case <-clearCacheTimeTicker.C:
-				log.Println("Clearing Cache")
 				go cache.CleanUpCache()
 			}
 			defer clearCacheWg.Done()
@@ -58,7 +57,8 @@ func main()  {
 
 	//Write cache if persist is true
 	if LoadedConfig.Cache.Persist {
-		//TODO read cache on startup
+		//read cache file on startup
+		cache.ReadCache(&LoadedConfig.Cache.WriteLocation)
 
 		var writeCacheWg sync.WaitGroup
 		writeCacheDuration, _ := time.ParseDuration(LoadedConfig.Cache.WriteInterval)
@@ -69,8 +69,7 @@ func main()  {
 			for {
 				select {
 				case <-writeCacheTimeTicker.C:
-					log.Println("Writing Cache")
-					//TODO write cache to file
+					cache.WriteCache(&LoadedConfig.Cache.WriteLocation)
 				}
 				defer writeCacheWg.Done()
 			}
