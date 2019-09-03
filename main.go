@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"ip-api-go-pkg"
 	"ip-api-proxy/cache"
+	"ip-api-proxy/config"
 	"ip-api-proxy/ipAPI"
 	"log"
 	"net/http"
@@ -14,13 +16,34 @@ import (
 	"time"
 )
 
+//Init config globally
+var LoadedConfig = config.Config{}
+
 func main()  {
+	var err error
+
+	//get config location flag
+	var configLocation string
+	flag.StringVar(&configLocation,"config","","Configuration file location. Defaults to working directory.")
+
+	//Parse flags
+	flag.Parse()
+
+	//Read config
+	LoadedConfig, err = config.ReadConfig(configLocation)
+
+	if err != nil {
+		panic(err)
+	}
+
 	http.HandleFunc("/",ipAIPProxy)
 
 	var clearCacheWg sync.WaitGroup
 
 	//Clear cache interval
-	clearCacheTimeTicker := time.NewTicker(10 * time.Second) //TODO turn this duration into a variable
+	clearCacheDuration,_ := time.ParseDuration(LoadedConfig.Cache.CleanInterval)
+
+	clearCacheTimeTicker := time.NewTicker(clearCacheDuration) //TODO turn this duration into a variable
 	clearCacheWg.Add(1)
 	go func() {
 		for {
@@ -129,7 +152,8 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//get key
 		keys, ok := r.URL.Query()["key"]
-		var key string
+		key := LoadedConfig.APIKey
+		//overwrite config api if passed through url
 		if len(keys) > 0 {
 			key = keys[0]
 		}
@@ -257,7 +281,8 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//get key
 		keys, ok := r.URL.Query()["key"]
-		var key string
+		key := LoadedConfig.APIKey
+		//overwrite config api if passed through url
 		if len(keys) > 0 {
 			key = keys[0]
 		}
