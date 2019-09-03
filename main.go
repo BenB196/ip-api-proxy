@@ -11,6 +11,7 @@ import (
 	"ip-api-proxy/ipAPI"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,7 +43,6 @@ func main()  {
 
 	//Clear cache interval
 	clearCacheDuration,_ := time.ParseDuration(LoadedConfig.Cache.CleanInterval)
-
 	clearCacheTimeTicker := time.NewTicker(clearCacheDuration) //TODO turn this duration into a variable
 	clearCacheWg.Add(1)
 	go func() {
@@ -56,11 +56,34 @@ func main()  {
 		}
 	}()
 
+	//Write cache if persist is true
+	if LoadedConfig.Cache.Persist {
+		//TODO read cache on startup
+
+		var writeCacheWg sync.WaitGroup
+		writeCacheDuration, _ := time.ParseDuration(LoadedConfig.Cache.WriteInterval)
+		writeCacheTimeTicker := time.NewTicker(writeCacheDuration)
+		writeCacheWg.Add(1)
+
+		go func() {
+			for {
+				select {
+				case <-writeCacheTimeTicker.C:
+					log.Println("Writing Cache")
+					//TODO write cache to file
+				}
+				defer writeCacheWg.Done()
+			}
+		}()
+	}
+
 	//Listen on port
 	log.Println("Starting server...")
-	if err := http.ListenAndServe(":8080",nil); err != nil {
+	if err := http.ListenAndServe(":" + strconv.Itoa(LoadedConfig.Port),nil); err != nil {
 		log.Fatal(err)
 	}
+
+	//TODO prometheus stuff
 }
 
 func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +101,8 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w,string(jsonLocation),http.StatusNotFound)
 		return
 	}
+
+	cacheAge, _ := time.ParseDuration(LoadedConfig.Cache.Age)
 
 	switch r.Method {
 	case "GET":
@@ -199,7 +224,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		//Add to cache if successful query
 		if newLocation.Status == "success" {
 			log.Println("Added: " + ip + " to cache.")
-			cache.AddLocation(ip,newLocation,10 * time.Second) //TODO turn duration into a variable
+			cache.AddLocation(ip,newLocation,cacheAge)
 			//Re-get query with specified fields
 			location, _ = cache.GetLocation(ip,validatedFields)
 		}
@@ -366,7 +391,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 					//Add to cache if successful query
 					if location.Status == "success" {
 						log.Println("Added: " + query.Query + " to cache.")
-						cache.AddLocation(query.Query,location,10 * time.Second) //TODO turn duration into a variable
+						cache.AddLocation(query.Query,location,cacheAge)
 						//Re-get query with specified fields
 						location, _ = cache.GetLocation(query.Query,validatedFields)
 					}
