@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io/ioutil"
 	"ip-api-go-pkg"
 	"ip-api-proxy/cache"
@@ -38,6 +39,11 @@ func main()  {
 	}
 
 	http.HandleFunc("/",ipAIPProxy)
+
+	if LoadedConfig.Prometheus.Enabled {
+		//Start prometheus metrics end point
+		http.Handle("/metrics",promhttp.Handler())
+	}
 
 	var clearCacheWg sync.WaitGroup
 
@@ -81,8 +87,6 @@ func main()  {
 	if err := http.ListenAndServe(":" + strconv.Itoa(LoadedConfig.Port),nil); err != nil {
 		log.Fatal(err)
 	}
-
-	//TODO prometheus stuff
 }
 
 func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
@@ -184,6 +188,14 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//Get ip address
 		ip := ipAPI.IPDNSRegexp.FindString(r.URL.Path)
+
+		if ip == "" {
+			location.Status = "failed"
+			location.Message = "400 query request is blank"
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
+		}
 
 		//Check cache for ip
 		location, found := cache.GetLocation(ip,validatedFields)
@@ -357,6 +369,9 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				location.Status = "failed"
 				location.Message = "400 " + err.Error()
+			} else if query.Query == "" {
+				location.Status = "failed"
+				location.Message = "400 query request is blank"
 			} else {
 				//Check cache for ip
 				location, found := cache.GetLocation(query.Query,validatedFields)

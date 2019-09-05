@@ -156,20 +156,6 @@ func ReadConfig(configLocation string) (Config,error) {
 		return Config{}, errors.New("error: port cannot be above 65535")
 	}
 
-	//validate prometheus if enabled
-	if config.Prometheus.Enabled {
-		if config.Prometheus.Port == 0 {
-			//set default 8081
-			config.Prometheus.Port = 8081
-		} else if config.Prometheus.Port < 1024 {
-			return Config{}, errors.New("error: prometheus port cannot be below 1024")
-		} else if config.Prometheus.Port > 65535 {
-			return Config{}, errors.New("error: prometheus port cannot be above 65535")
-		} else if config.Port == config.Prometheus.Port {
-			return Config{}, errors.New("error: port and prometheus port cannot be the same port")
-		}
-	}
-
 	return config, nil
 
 }
