@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"github.com/BenB196/ip-api-go-pkg"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io/ioutil"
-	"ip-api-go-pkg"
 	"ip-api-proxy/cache"
 	"ip-api-proxy/config"
 	"ip-api-proxy/ipAPI"

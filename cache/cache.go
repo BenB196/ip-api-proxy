@@ -3,7 +3,7 @@ package cache
 import (
 	"encoding/gob"
 	"errors"
-	"ip-api-go-pkg"
+	"github.com/BenB196/ip-api-go-pkg"
 	"ip-api-proxy/ipAPI"
 	"ip-api-proxy/promMetrics"
 	"log"
