@@ -5,6 +5,7 @@ import (
 	"errors"
 	"ip-api-go-pkg"
 	"ip-api-proxy/ipAPI"
+	"ip-api-proxy/promMetrics"
 	"log"
 	"os"
 	"strings"
@@ -27,6 +28,7 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 		//Check if record has not expired
 		if time.Now().In(loc).Sub(record.ExpirationTime) > 0 {
 			//Remove record if expired and return false
+			promMetrics.DecreaseQueriesCachedCurrent()
 			delete(RecordCache,query)
 			return ip_api.Location{},false
 		}
@@ -35,6 +37,8 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 		location := ip_api.Location{}
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ipAPI.AllowedAPIFields) {
+			promMetrics.IncrementCacheHits()
+			promMetrics.IncrementSuccessfulQueries()
 			return record.Location, true
 		} else {
 			fieldSlice := strings.Split(fields,",")
@@ -89,6 +93,8 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 			}
 		}
 		//Return location
+		promMetrics.IncrementCacheHits()
+		promMetrics.IncrementSuccessfulQueries()
 		return location, true
 	}
 	//record not found in cache return false
@@ -108,6 +114,8 @@ func AddLocation(query string,location ip_api.Location, expirationDuration time.
 		ExpirationTime: expirationTime,
 		Location:       location,
 	}
+	promMetrics.IncrementQueriesCachedTotal()
+	promMetrics.IncrementQueriesCachedCurrent()
 }
 
 //TODO func to remove records from cache after expire time
@@ -122,6 +130,7 @@ func CleanUpCache() {
 	//Loop through map and remove expired times
 	for query, record := range RecordCache {
 		if currentTime.Sub(record.ExpirationTime) > 0 {
+			promMetrics.DecreaseQueriesCachedCurrent()
 			delete(RecordCache,query)
 		}
 	}
