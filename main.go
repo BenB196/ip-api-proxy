@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io/ioutil"
 	"ip-api-go-pkg"
@@ -50,7 +49,7 @@ func main()  {
 
 	//Clear cache interval
 	clearCacheDuration,_ := time.ParseDuration(LoadedConfig.Cache.CleanInterval)
-	clearCacheTimeTicker := time.NewTicker(clearCacheDuration) //TODO turn this duration into a variable
+	clearCacheTimeTicker := time.NewTicker(clearCacheDuration)
 	clearCacheWg.Add(1)
 	go func() {
 		for {
@@ -269,10 +268,14 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case "POST":
+		promMetrics.IncrementQueriesProcessed()
 		//check to make sure that only batch end point is getting POST requests
 		if r.URL.Path != "/batch" {
-			http.Error(w,"400 POST requests only supported for /batch.",http.StatusBadRequest) //TODO return error in proper form
+			location.Status = "failed"
+			location.Message = "400 POST requests only supported for /batch."
 			promMetrics.IncrementHandlerRequests("400")
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
 			return
 		}
 
@@ -372,15 +375,11 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//TODO delete
-		log.Println(queries)
-
 		var locations []ip_api.Location
 
 		//Loop through queries from post data and handle each query as a single query
 		//TODO goroutine?
 		for _, query := range queries {
-			promMetrics.IncrementQueriesProcessed()
 			//validate any sub fields
 			if query.Fields != "" {
 				validatedFields, err = ipAPI.ValidateFields(query.Fields)
@@ -466,10 +465,12 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	default:
-		_, err := fmt.Fprintf(w, "Error, server only supports GET and POST requests.") //TODO return in proper format
+		var location ip_api.Location
+		location.Status = "failed"
+		location.Message = "404, server only supports GET and POST requests."
 		promMetrics.IncrementHandlerRequests("404")
-		if err != nil {
-			log.Println(err)
-		}
+		jsonLocation, _ := json.Marshal(&location)
+		http.Error(w,string(jsonLocation),http.StatusBadRequest)
+		return
 	}
 }
