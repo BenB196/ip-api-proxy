@@ -15,14 +15,14 @@ The only difference with value returns with the proxy API is that when a query f
 
 ## Install
 ### Build from Source
-TODO varify that this works
+
 ```
 $ mkdir -p $GOPATH/src/github.com/BenB196/ip-api-proxy
 $ cd $GOPATH/src/github.com/BenB196/ip-api-proxy
 $ git clone github.com/BenB196/ip-api-proxy.git
 $ cd ip-api-proxy
-$ env GOOS=desired_os GOARCH=design_architecture go build -mod vendor -o /path/to/output/location
-$ ./ip-api-proxy --config=/path/to/config.json
+$ env GOOS=desired_os GOARCH=design_architecture go build -mod vendor -o /path/to/output/location #This command varies slightly based off of OS.
+$ /path/to/output/location/ip-api-proxy --config=/path/to/config.json
 ```
 
 ### Precompiled binaries
