@@ -13,9 +13,21 @@ The only difference with value returns with the proxy API is that when a query f
 1. This proxy is not intended to bypass IP-API's request limit of [150 requests per minute](http://ip-api.com/docs/api:json) on the free API URL. In fact there are no checks in this application to make sure that you never hit this limit, it just goes full throttle all the time. If you need to make more than 150 requests per minute, just buy the Pro service, its inexpensive.
 2. Batch requests are handled differently with this proxy then you would expect when compared to the normal [IP-API batch](http://ip-api.com/docs/api:batch) request. This proxy will break apart a batch request it receives and execute each request individually. This means that if you are using the free API URL, you need to be conscious of how many requests will actually be made from a request.
 
-## Install from Source
+## Install
+### Build from Source
+TODO varify that this works
+```
+$ mkdir -p $GOPATH/src/github.com/BenB196/ip-api-proxy
+$ cd $GOPATH/src/github.com/BenB196/ip-api-proxy
+$ git clone github.com/BenB196/ip-api-proxy.git
+$ cd ip-api-proxy
+$ env GOOS=desired_os GOARCH=design_architecture go build -mod vendor -o /path/to/output/location
+$ ./ip-api-proxy --config=/path/to/config.json
+```
 
-## Docker
+### Precompiled binaries
+
+### Docker
 TODO add this
 
 ## Configuration
