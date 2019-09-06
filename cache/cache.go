@@ -19,7 +19,15 @@ type Record struct {
 
 var RecordCache = map[string]Record{}
 
-//TODO func to check cache for record
+/*
+GetLocation - function for getting the location of a query from cache
+query - IP/DNS entry
+fields - string of comma separated values
+
+returns
+ip_api Location
+error
+ */
 func GetLocation(query string, fields string) (ip_api.Location,bool) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
@@ -33,7 +41,6 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 			return ip_api.Location{},false
 		}
 
-		//TODO return only the fields that were requested
 		location := ip_api.Location{}
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ipAPI.AllowedAPIFields) {
@@ -101,7 +108,12 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 	return ip_api.Location{},false
 }
 
-//TODO func to add record to cache
+/*
+AddLocation - adds a query + location to cache map along with an expiration time
+query - IP/DNS value
+location - ip_api location
+expirationDuration - duration in which the query will expire (go stale)
+ */
 func AddLocation(query string,location ip_api.Location, expirationDuration time.Duration) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
@@ -118,7 +130,9 @@ func AddLocation(query string,location ip_api.Location, expirationDuration time.
 	promMetrics.IncrementQueriesCachedCurrent()
 }
 
-//TODO func to remove records from cache after expire time
+/*
+CleanUpCache - function which removes expired (stale) query/locations from the Cache
+ */
 func CleanUpCache() {
 	log.Println("Starting Cache Clean Up")
 	//set timezone
@@ -137,7 +151,10 @@ func CleanUpCache() {
 	log.Println("Finished Cache Clean Up")
 }
 
-//TODO func to write cache to file
+/*
+WriteCache - writes the cache to a file on disk to be read on app restarts
+writeLocation - string containing the write path
+ */
 func WriteCache(writeLocation *string) {
 	log.Println("Starting Cache Write")
 	//create file name
@@ -168,7 +185,10 @@ func WriteCache(writeLocation *string) {
 	log.Println("Finished Cache Write")
 }
 
-//TODO func to read cache from file
+/*
+ReadCache - reads the cache file from disk and loads it into the Cache map
+writeLocation - string containing the file path.
+ */
 func ReadCache(writeLocation *string) {
 	//create filename
 	fileName := *writeLocation + "cache.gob"
