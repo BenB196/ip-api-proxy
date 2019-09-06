@@ -13,6 +13,40 @@ The only difference with value returns with the proxy API is that when a query f
 1. This proxy is not intended to bypass IP-API's request limit of [150 requests per minute](http://ip-api.com/docs/api:json) on the free API URL. In fact there are no checks in this application to make sure that you never hit this limit, it just goes full throttle all the time. If you need to make more than 150 requests per minute, just buy the Pro service, its inexpensive.
 2. Batch requests are handled differently with this proxy then you would expect when compared to the normal [IP-API batch](http://ip-api.com/docs/api:batch) request. This proxy will break apart a batch request it receives and execute each request individually. This means that if you are using the free API URL, you need to be conscious of how many requests will actually be made from a request.
 
+## Install from Source
+
+## Docker
+TODO add this
+
+## Configuration
+
+This proxy accepts a json Config file.
+
+You can specify the location of the config file by passing the --config flag when running the application (ex: --config=/path/to/config.json).
+
+If you do not specify a config file location, the application will default to trying to read ./config.json
+
+An example config file can be found [here](docs/example_config.json).
+
+### Config settings
+
+```
+{
+  "cache": {
+    "persist": false,       #If this is set to true, then the cache will be periodically written to disk, so that it can be read in the event of an app restart. Default: false
+    "cleanInterval": "30m", #This is the interval that the proxy will go through and clean up any stale results from the cache which have expired. Default: 30m
+    "writeInterval": "30m", #This is the interval that the cache is written to disk. Default: 30m, only works if persist == true.
+    "writeLocation": "",    #This is the location where the cache will be written to disk. Defaul: working directory, only works if persist == true.
+    "age": "24h"            #This is the age that a result is given, after which the result is marked as stale. Default: 24h
+  },
+  "port": 8080,             #This is the port which the application listens on. Default: 8080
+  "apiKey": "",             #This is the API for using IP-API's pro API. Default: "", resorts to using the free API
+  "prometheus": {
+    "enabled": false        #This determines whether the Prometheus metrics endpoint is active. Default: false
+  }
+}
+```
+
 ## Prometheus Integration
 
 This proxy has been designed to support [Prometheus](https://prometheus.io/) metrics on the /metrics endpoint (ex: localhost:8080/metrics) 
