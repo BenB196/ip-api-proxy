@@ -7,6 +7,7 @@ import (
 	"ip-api-proxy/utils"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -50,27 +51,34 @@ func ReadConfig(configLocation string) (Config,error) {
 	}
 
 	//open config file
+	var skipConfig bool
+	//init config var
+	var config Config
 	configFile, err := os.Open(configLocation)
 
 	if err != nil {
-		return Config{}, errors.New("error: opening config file: " + err.Error())
+		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
+			skipConfig = true
+			config = Config{}
+		} else {
+			return Config{}, errors.New("error: opening config file: " + err.Error())
+		}
 	}
 
-	//Read config file to bytes
-	fileData, err := ioutil.ReadAll(configFile)
+	if !skipConfig {
+		//Read config file to bytes
+		fileData, err := ioutil.ReadAll(configFile)
 
-	if err != nil {
-		return Config{}, errors.New("error: reading config file: " + err.Error())
-	}
+		if err != nil {
+			return Config{}, errors.New("error: reading config file: " + err.Error())
+		}
 
-	//init config var
-	var config Config
+		//unmarshal config with json
+		err = json.Unmarshal(fileData,&config)
 
-	//unmarshal config with json
-	err = json.Unmarshal(fileData,&config)
-
-	if err != nil {
-		return Config{}, errors.New("error: unmarshaling config file to json: " + err.Error())
+		if err != nil {
+			return Config{}, errors.New("error: unmarshaling config file to json: " + err.Error())
+		}
 	}
 
 	//validate cache
