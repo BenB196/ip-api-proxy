@@ -377,84 +377,100 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		var locations []ip_api.Location
 
-		//Loop through queries from post data and handle each query as a single query
-		//TODO goroutine?
-		for _, query := range queries {
-			//validate any sub fields
-			if query.Fields != "" {
-				validatedFields, err = ipAPI.ValidateFields(query.Fields)
-			}
-
-			//validate any sub langs
-			if query.Lang != "" {
-				validatedLang, err = ipAPI.ValidateLang(query.Lang)
-			}
-
-			//init location
-			var location ip_api.Location
-
-			//If err on sub fields or sub lang set as failed query status with err in message
-			if err != nil {
-				location.Status = "failed"
-				location.Message = "400 " + err.Error()
-				promMetrics.IncrementHandlerRequests("400")
-			} else if query.Query == "" {
-				location.Status = "failed"
-				location.Message = "400 query request is blank"
-				promMetrics.IncrementHandlerRequests("400")
-			} else {
-				//Check cache for ip
-				location, found := cache.GetLocation(query.Query,validatedFields)
-
-				//If ip found in cache return cached value
-				if found {
-					log.Println("Found: " + query.Query + " in cache.")
-					promMetrics.IncrementHandlerRequests("200")
-					//Append query to location list
-					locations = append(locations, location)
-				}
-
-				//execute query
-				if !found {
-					//Build query
-					queryStruct := ip_api.Query{
-						Queries:[]ip_api.QueryIP{
-							{Query:query.Query},
-						},
-						Fields:strings.Join(ipAPI.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
-						Lang:validatedLang,
-					}
-
-					promMetrics.IncrementQueriesForwarded()
-					location, err = ip_api.SingleQuery(queryStruct,key,"")
-
-					if err != nil {
-						location = ip_api.Location{}
-						location.Status = "failed"
-						location.Message = "400 " + err.Error()
-						promMetrics.IncrementHandlerRequests("400")
-					}
-
-					//Add to cache if successful query
-					if location.Status == "success" {
-						log.Println("Added: " + query.Query + " to cache.")
-						cache.AddLocation(query.Query,location,cacheAge)
-						//Re-get query with specified fields
-						promMetrics.IncrementHandlerRequests("200")
-						promMetrics.IncrementSuccessfulQueries()
-						location, _ = cache.GetLocation(query.Query,validatedFields)
-					}
-
-					if location.Status == "failed" {
-						promMetrics.IncrementHandlerRequests("400")
-						promMetrics.IncrementFailedQueries()
-					}
-
-					//Append query to location list
-					locations = append(locations, location)
-				}
-			}
+		//validate the queries were actually passed
+		if len(queries) == 0 {
+			location.Status = "failed"
+			location.Message = "400 no queries passed"
+			promMetrics.IncrementHandlerRequests("400")
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w,string(jsonLocation),http.StatusBadRequest)
+			return
 		}
+
+		//Loop through queries from post data and handle each query as a single query
+		var wg sync.WaitGroup
+		wg.Add(len(queries))
+		go func() {
+			for _, query := range queries {
+				defer wg.Done()
+				//validate any sub fields
+				if query.Fields != "" {
+					validatedFields, err = ipAPI.ValidateFields(query.Fields)
+				}
+
+				//validate any sub langs
+				if query.Lang != "" {
+					validatedLang, err = ipAPI.ValidateLang(query.Lang)
+				}
+
+				//init location
+				var location ip_api.Location
+
+				//If err on sub fields or sub lang set as failed query status with err in message
+				if err != nil {
+					location.Status = "failed"
+					location.Message = "400 " + err.Error()
+					promMetrics.IncrementHandlerRequests("400")
+				} else if query.Query == "" {
+					location.Status = "failed"
+					location.Message = "400 query request is blank"
+					promMetrics.IncrementHandlerRequests("400")
+				} else {
+					//Check cache for ip
+					location, found := cache.GetLocation(query.Query,validatedFields)
+
+					//If ip found in cache return cached value
+					if found {
+						log.Println("Found: " + query.Query + " in cache.")
+						promMetrics.IncrementHandlerRequests("200")
+						//Append query to location list
+						locations = append(locations, location)
+					}
+
+					//execute query
+					if !found {
+						//Build query
+						queryStruct := ip_api.Query{
+							Queries:[]ip_api.QueryIP{
+								{Query:query.Query},
+							},
+							Fields:strings.Join(ipAPI.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
+							Lang:validatedLang,
+						}
+
+						promMetrics.IncrementQueriesForwarded()
+						location, err = ip_api.SingleQuery(queryStruct,key,"")
+
+						if err != nil {
+							location = ip_api.Location{}
+							location.Status = "failed"
+							location.Message = "400 " + err.Error()
+							promMetrics.IncrementHandlerRequests("400")
+						}
+
+						//Add to cache if successful query
+						if location.Status == "success" {
+							log.Println("Added: " + query.Query + " to cache.")
+							cache.AddLocation(query.Query,location,cacheAge)
+							//Re-get query with specified fields
+							promMetrics.IncrementHandlerRequests("200")
+							promMetrics.IncrementSuccessfulQueries()
+							location, _ = cache.GetLocation(query.Query,validatedFields)
+						}
+
+						if location.Status == "failed" {
+							promMetrics.IncrementHandlerRequests("400")
+							promMetrics.IncrementFailedQueries()
+						}
+
+						//Append query to location list
+						locations = append(locations, location)
+					}
+				}
+			}
+		}()
+
+		wg.Wait()
 
 		//return query as an array
 		jsonLocations, _ := json.Marshal(&locations)

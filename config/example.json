@@ -1,0 +1,14 @@
+{
+  "cache": {
+    "persist": true,
+    "cleanInterval": "30m",
+    "writeInterval": "30m",
+    "writeLocation": "",
+    "age": "24h"
+  },
+  "port": 8080,
+  "apiKey": "",
+  "prometheus": {
+    "enabled": true
+  }
+}
