@@ -27,6 +27,8 @@ $ /path/to/output/location/ip-api-proxy --config=/path/to/config.json
 
 ### Precompiled binaries
 
+These are found attached to each release. Current plan is to only release the Windows amd64 and Linux amd64 bins initially. More will be added eventually.
+
 ### Docker
 TODO add this
 
