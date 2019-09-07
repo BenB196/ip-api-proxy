@@ -3,8 +3,8 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"github.com/BenB196/ip-api-proxy/utils"
 	"io/ioutil"
-	"ip-api-proxy/utils"
 	"os"
 	"path/filepath"
 	"strings"
