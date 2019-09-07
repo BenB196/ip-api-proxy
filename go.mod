@@ -1,4 +1,4 @@
-module ip-api-proxy
+module github.com/BenB196/ip-api-proxy
 
 go 1.12
 
