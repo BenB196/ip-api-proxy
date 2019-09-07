@@ -4,7 +4,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"github.com/BenB196/ip-api-go-pkg"
-	"github.com/BenB196/ip-api-proxy/ipAPI"
 	"github.com/BenB196/ip-api-proxy/promMetrics"
 	"log"
 	"os"
@@ -43,7 +42,7 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 
 		location := ip_api.Location{}
 		//check if all fields are passed, if so just return location
-		if len(fields) == len(ipAPI.AllowedAPIFields) {
+		if len(fields) == len(ip_api.AllowedAPIFields) {
 			promMetrics.IncrementCacheHits()
 			promMetrics.IncrementSuccessfulQueries()
 			return record.Location, true

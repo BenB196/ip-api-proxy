@@ -6,12 +6,12 @@ import (
 	"github.com/BenB196/ip-api-go-pkg"
 	"github.com/BenB196/ip-api-proxy/cache"
 	"github.com/BenB196/ip-api-proxy/config"
-	"github.com/BenB196/ip-api-proxy/ipAPI"
 	"github.com/BenB196/ip-api-proxy/promMetrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +20,8 @@ import (
 
 //Init config globally
 var LoadedConfig = config.Config{}
+
+var IPDNSRegexp = regexp.MustCompile(`((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}|(([a-zA-Z])|([a-zA-Z][a-zA-Z])|([a-zA-Z][0-9])|([0-9][a-zA-Z])|([a-zA-Z0-9][a-zA-Z0-9-_]{1,61}[a-zA-Z0-9]))\.([a-zA-Z]{2,6}|[a-zA-Z0-9-]{2,30}\.[a-zA-Z]{2,3}))`)
 
 func main()  {
 	var err error
@@ -159,7 +161,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		var validatedFields string
 		var err error
 		if len(fields) > 0 {
-			validatedFields, err = ipAPI.ValidateFields(fields[0])
+			validatedFields, err = ip_api.ValidateFields(fields[0])
 
 			if err != nil {
 				location.Status = "failed"
@@ -174,7 +176,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		//validate lang
 		var validatedLang string
 		if len(lang) > 0 {
-			validatedLang, err = ipAPI.ValidateLang(lang[0])
+			validatedLang, err = ip_api.ValidateLang(lang[0])
 
 			if err != nil {
 				location.Status = "failed"
@@ -195,7 +197,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//Get ip address
-		ip := ipAPI.IPDNSRegexp.FindString(r.URL.Path)
+		ip := IPDNSRegexp.FindString(r.URL.Path)
 
 		if ip == "" {
 			location.Status = "failed"
@@ -227,7 +229,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			Queries:[]ip_api.QueryIP{
 				{Query:ip},
 			},
-			Fields:strings.Join(ipAPI.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
+			Fields:strings.Join(ip_api.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
 			Lang:validatedLang,
 		}
 
@@ -317,7 +319,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		var validatedFields string
 		var err error
 		if len(fields) > 0 {
-			validatedFields, err = ipAPI.ValidateFields(fields[0])
+			validatedFields, err = ip_api.ValidateFields(fields[0])
 
 			if err != nil {
 				location.Status = "failed"
@@ -332,7 +334,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 		//validate lang
 		var validatedLang string
 		if len(lang) > 0 {
-			validatedLang, err = ipAPI.ValidateLang(lang[0])
+			validatedLang, err = ip_api.ValidateLang(lang[0])
 
 			if err != nil {
 				location.Status = "failed"
@@ -395,12 +397,12 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 				defer wg.Done()
 				//validate any sub fields
 				if query.Fields != "" {
-					validatedFields, err = ipAPI.ValidateFields(query.Fields)
+					validatedFields, err = ip_api.ValidateFields(query.Fields)
 				}
 
 				//validate any sub langs
 				if query.Lang != "" {
-					validatedLang, err = ipAPI.ValidateLang(query.Lang)
+					validatedLang, err = ip_api.ValidateLang(query.Lang)
 				}
 
 				//init location
@@ -434,7 +436,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 							Queries:[]ip_api.QueryIP{
 								{Query:query.Query},
 							},
-							Fields:strings.Join(ipAPI.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
+							Fields:strings.Join(ip_api.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
 							Lang:validatedLang,
 						}
 
