@@ -41,6 +41,12 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 		}
 
 		location := ip_api.Location{}
+
+		//Set default fields if fields string is empty
+		if fields == "" {
+			fields = "query,status,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as"
+		}
+
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ip_api.AllowedAPIFields) {
 			promMetrics.IncrementCacheHits()
