@@ -17,11 +17,11 @@ The only difference with value returns with the proxy API is that when a query f
 ### Build from Source
 
 ```
-$ mkdir -p $GOPATH/src/github.com/BenB196/ip-api-proxy
-$ cd $GOPATH/src/github.com/BenB196/ip-api-proxy
-$ git clone github.com/BenB196/ip-api-proxy.git
+$ mkdir -p $GOPATH/src/github.com/BenB196/
+$ cd $GOPATH/src/github.com/BenB196/
+$ git clone https://github.com/BenB196/ip-api-proxy.git
 $ cd ip-api-proxy
-$ env GOOS=desired_os GOARCH=design_architecture go build -mod vendor -o /path/to/output/location #This command varies slightly based off of OS.
+$ env GOOS=desired_os GOARCH=design_architecture go build -o /path/to/output/location #This command varies slightly based off of OS.
 $ /path/to/output/location/ip-api-proxy --config=/path/to/config.json
 ```
 
