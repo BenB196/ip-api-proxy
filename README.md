@@ -30,7 +30,39 @@ $ /path/to/output/location/ip-api-proxy --config=/path/to/config.json
 These are found attached to each release. Current plan is to only release the Windows amd64 and Linux amd64 bins initially. More will be added eventually.
 
 ### Docker
-TODO add this
+
+This proxy is able to be run in a Docker container as well.
+
+Pull:
+```docker pull benb196/ip-api-proxy```
+
+The container can either be run stateless (if persist == false in the config):
+
+```
+docker run -d -p <external_port>:<container_port> benb196/ip-api-proxy
+```
+
+If you want to persist the cache, then you can mount a volume to /root/.
+
+```
+docker run -d\
+ -p <external_port>:<container_port>\
+ -v /path/to/storage:/root\
+ benb196/ip-api-proxy
+```
+
+#### Docker Compose (3)
+
+```
+version: "3"
+services:
+  ip-api-proxy:
+    image: benb196/ip-api-proxy
+    volumes:
+      - /path/to/storage:/root
+    ports:
+      - 8080:8080
+```
 
 ## Configuration
 
