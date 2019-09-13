@@ -16,5 +16,6 @@ VOLUME ["/ip-api-proxy"]
 WORKDIR /ip-api-proxy
 COPY --from=builder /app/ip-api-proxy /bin/ip-api-proxy
 
-ENTRYPOINT ["/usr/sbin/update-ca-certificates & /bin/ip-api-proxy"]
+CMD ["/usr/sbin/update-ca-certificates"]
+ENTRYPOINT ["/bin/ip-api-proxy"]
 CMD ["--config=/etc/ip-api-proxy/config.json"]
