@@ -383,8 +383,6 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var locations []ip_api.Location
-
 		//validate the queries were actually passed
 		if len(requests) == 0 {
 			location.Status = "failed"
