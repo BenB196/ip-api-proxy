@@ -403,15 +403,20 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(len(requests))
 		go func() {
 			for _, request := range requests {
+				var validatedSubFields string
 				//validate sub fields
 				if request.Fields != "" {
-					validatedFields, err = ip_api.ValidateFields(request.Fields)
+					validatedSubFields, err = ip_api.ValidateFields(request.Fields)
 				}
 
 				//validate sub lang
+				var validatedSubLang string
 				if request.Lang != "" {
-					validatedLang, err = ip_api.ValidateLang(request.Lang)
+					validatedSubLang, err = ip_api.ValidateLang(request.Lang)
 				}
+
+				//TODO implement usage of validatedSubLang
+				log.Println(validatedSubLang)
 
 				//init location
 				var location ip_api.Location
@@ -427,17 +432,23 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					promMetrics.IncrementHandlerRequests("400")
 				} else {
 					//Check cache for ip
-					location, found := cache.GetLocation(request.Query,validatedFields)
+					location, found := cache.GetLocation(request.Query,validatedSubFields)
 
 					//if found in cache add to cached request list
 					if found {
 						promMetrics.IncrementCacheHits()
+						log.Println("Found: " + request.Query + " in cache.")
 						cachedLocations = append(cachedLocations, location)
 					} else {
 						//if not found in cache add to not cache request list
 						promMetrics.IncrementQueriesForwarded()
-						notCachedRequests = append(notCachedRequests, request)
+						//add request to map for later lookups
 						notCachedRequestsMap[request.Query] = request
+
+						//set fields to all so that everything is stored in cache
+						request.Fields = strings.Join(ip_api.AllowedAPIFields,",")
+						notCachedRequests = append(notCachedRequests, request)
+
 					}
 				}
 				wg.Done()
@@ -450,7 +461,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			//Build batch request of non-cached requests
 			batchQuery := ip_api.Query{
 				Queries: notCachedRequests,
-				Fields:  validatedFields,
+				Fields:  strings.Join(ip_api.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
 				Lang:    validatedLang,
 			}
 
@@ -486,17 +497,20 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 						}
 
 						//Store non-cached location in cache and get back proper fields location
-						cache.AddLocation(location.Query,location,cacheAge)
+						cache.AddLocation(notCachedLocations[i].Query,notCachedLocations[i],cacheAge)
+						log.Println("Added: " + notCachedLocations[i].Query + " in cache.")
 
 						var fields string
 
-						if requestMap, ok := notCachedRequestsMap[location.Query]; ok {
+						if requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]; ok {
 							fields = requestMap.Fields
+						} else if validatedFields != "" {
+							fields = validatedFields
 						} else {
 							fields = ""
 						}
 
-						cachedLocation, _ := cache.GetLocation(location.Query, fields)
+						cachedLocation, _ := cache.GetLocation(notCachedLocations[i].Query, fields)
 
 						cachedNewLocations = append(cachedNewLocations,cachedLocation)
 
