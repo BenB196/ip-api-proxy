@@ -100,18 +100,33 @@ This proxy has been designed to support [Prometheus](https://prometheus.io/) met
 The following are the currently supported metrics outside of the standard Golang metrics which Prometheus natively adds.
 
 ```
+# HELP ip_api_proxy_batch_queries_processed_total The total number of batch queries processed
+# TYPE ip_api_proxy_batch_queries_processed_total counter
+ip_api_proxy_batch_queries_processed_total 0
+# HELP ip_api_proxy_batch_requests_processed_total The total number of batch requests processed
+# TYPE ip_api_proxy_batch_requests_processed_total counter
+ip_api_proxy_batch_requests_processed_total 0
 # HELP ip_api_proxy_cache_hits_total The total number of times that cache has served up a request
 # TYPE ip_api_proxy_cache_hits_total counter
 ip_api_proxy_cache_hits_total 0
 # HELP ip_api_proxy_failed_batch_queries_total The total number of failed batch queries
 # TYPE ip_api_proxy_failed_batch_queries_total counter
 ip_api_proxy_failed_batch_queries_total 0
+# HELP ip_api_proxy_failed_batch_requests_total The total number of failed batch requests
+# TYPE ip_api_proxy_failed_batch_requests_total counter
+ip_api_proxy_failed_batch_requests_total 0
 # HELP ip_api_proxy_failed_queries_total The total number of failed queries
 # TYPE ip_api_proxy_failed_queries_total counter
 ip_api_proxy_failed_queries_total 0
+# HELP ip_api_proxy_failed_requests_total The total number of failed requests
+# TYPE ip_api_proxy_failed_requests_total counter
+ip_api_proxy_failed_requests_total 0
 # HELP ip_api_proxy_failed_single_queries_total The total number of failed single queries
 # TYPE ip_api_proxy_failed_single_queries_total counter
 ip_api_proxy_failed_single_queries_total 0
+# HELP ip_api_proxy_failed_single_requests_total The total number of failed single requests
+# TYPE ip_api_proxy_failed_single_requests_total counter
+ip_api_proxy_failed_single_requests_total 0
 # HELP ip_api_proxy_handler_requests_total Total number of requests by HTTP status code
 # TYPE ip_api_proxy_handler_requests_total counter
 ip_api_proxy_handler_requests_total{code="200"} 0
@@ -120,7 +135,7 @@ ip_api_proxy_handler_requests_total{code="404"} 0
 # HELP ip_api_proxy_queries_cached_total The total number of queries that have been cached locally
 # TYPE ip_api_proxy_queries_cached_total counter
 ip_api_proxy_queries_cached_total 0
-# HELP ip_api_proxy_queries_forwarded_total The total number of queries forwarded to the IP API, API
+# HELP ip_api_proxy_queries_forwarded_total The total number of queries forwarded to IP-API
 # TYPE ip_api_proxy_queries_forwarded_total counter
 ip_api_proxy_queries_forwarded_total 0
 # HELP ip_api_proxy_queries_in_cache The current number of unique queries in the cache currently
@@ -129,6 +144,18 @@ ip_api_proxy_queries_in_cache 0
 # HELP ip_api_proxy_queries_total The total number of queries processed
 # TYPE ip_api_proxy_queries_total counter
 ip_api_proxy_queries_total 0
+# HELP ip_api_proxy_requests_forwarded_total The total number of requests forwarded to IP-API
+# TYPE ip_api_proxy_requests_forwarded_total counter
+ip_api_proxy_requests_forwarded_total 0
+# HELP ip_api_proxy_requests_total The total number of requests processed
+# TYPE ip_api_proxy_requests_total counter
+ip_api_proxy_requests_total 0
+# HELP ip_api_proxy_single_queries_processed_total The total number of single queries processed
+# TYPE ip_api_proxy_single_queries_processed_total counter
+ip_api_proxy_single_queries_processed_total 0
+# HELP ip_api_proxy_single_requests_processed_total The total number of single requests processed
+# TYPE ip_api_proxy_single_requests_processed_total counter
+ip_api_proxy_single_requests_processed_total 0
 # HELP ip_api_proxy_successful_batch_queries_total The total number of successfully fulfilled batch queries
 # TYPE ip_api_proxy_successful_batch_queries_total counter
 ip_api_proxy_successful_batch_queries_total 0
