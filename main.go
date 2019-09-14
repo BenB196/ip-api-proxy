@@ -426,10 +426,14 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					location.Status = "failed"
 					location.Message = "400 " + err.Error()
+					location.Query = request.Query
+					cachedLocations = append(cachedLocations, location) //Even though they aren't cached, we don't want to execute these as they are bad
 					promMetrics.IncrementHandlerRequests("400")
 				} else if request.Query == "" {
 					location.Status = "failed"
 					location.Message = "400 request is blank"
+					location.Query = request.Query
+					cachedLocations = append(cachedLocations, location) //Even though they aren't cached, we don't want to execute these as they are bad
 					promMetrics.IncrementHandlerRequests("400")
 				} else {
 					//Check cache for ip
@@ -502,56 +506,43 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 				//loop through not cached locations and get reverse records
 				wg.Add(len(notCachedLocations))
 				go func() {
-					for i, location := range notCachedLocations {
+					for _, location := range notCachedLocations {
 						if location.Status != "failed" {
 							names, err := net.LookupAddr(location.Query)
-
-							if err != nil {
-								notCachedLocations[i].Status = "failed"
-								notCachedLocations[i].Message = "400 reverse lookup failed: " + err.Error()
-								promMetrics.IncrementHandlerRequests("400")
-								promMetrics.IncrementFailedQueries()
-								promMetrics.IncrementFailedBatchQueries()
-								cachedNewLocations = append(cachedNewLocations,location)
-							} else {
-								if len(names) > 0 {
-									notCachedLocations[i].Reverse = names[0]
-								}
-
-								//set lang value
-								var lang string
-								requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]
-								if ok {
-									if requestMap.Lang != "" {
-										lang = requestMap.Lang
-									} else {
-										lang = validatedLang
-									}
+							if len(names) > 0 && err == nil {
+								location.Reverse = names[0]
+							}
+							//set lang value
+							var lang string
+							requestMap, ok := notCachedRequestsMap[location.Query]
+							if ok {
+								if requestMap.Lang != "" {
+									lang = requestMap.Lang
 								} else {
 									lang = validatedLang
 								}
-
-								//Store non-cached location in cache and get back proper fields location
-								cache.AddLocation(notCachedLocations[i].Query + lang,notCachedLocations[i],cacheAge)
-								log.Println("Added: " + notCachedLocations[i].Query + lang + " in cache.")
-
-								//set fields value
-								var fields string
-								if requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]; ok {
-									fields = requestMap.Fields
-								} else {
-									fields = validatedFields
-								}
-
-								cachedLocation, _ := cache.GetLocation(notCachedLocations[i].Query + lang, fields)
-
-								cachedNewLocations = append(cachedNewLocations,cachedLocation)
-
-								promMetrics.IncrementSuccessfulQueries()
-								promMetrics.IncrementSuccessfulBatchQueries()
+							} else {
+								lang = validatedLang
 							}
+
+							//Store non-cached location in cache and get back proper fields location
+							cache.AddLocation(location.Query+lang, location, cacheAge)
+							log.Println("Added: " + location.Query + lang + " in cache.")
+
+							//set fields value
+							var fields string
+							if requestMap, ok := notCachedRequestsMap[location.Query]; ok {
+								fields = requestMap.Fields
+							} else {
+								fields = validatedFields
+							}
+
+							cachedLocation, _ := cache.GetLocation(location.Query+lang, fields)
+							cachedNewLocations = append(cachedNewLocations, cachedLocation)
+							promMetrics.IncrementSuccessfulQueries()
+							promMetrics.IncrementSuccessfulBatchQueries()
 						} else {
-							cachedNewLocations = append(cachedNewLocations,location)
+							cachedNewLocations = append(cachedNewLocations, location)
 							promMetrics.IncrementFailedQueries()
 							promMetrics.IncrementFailedBatchQueries()
 						}
