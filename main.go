@@ -547,11 +547,13 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
-	var location ip_api.Location
-	location.Status = "failed"
-	location.Message = "404, server only supports GET (/json/ endpoint) and POST (/batch endpoint) requests."
-	promMetrics.IncrementHandlerRequests("404")
-	jsonLocation, _ := json.Marshal(&location)
-	http.Error(w,string(jsonLocation),http.StatusBadRequest)
-	return
+	if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
+		var location ip_api.Location
+		location.Status = "failed"
+		location.Message = "404, server only supports GET (/json/ endpoint) and POST (/batch endpoint) requests."
+		promMetrics.IncrementHandlerRequests("404")
+		jsonLocation, _ := json.Marshal(&location)
+		http.Error(w,string(jsonLocation),http.StatusBadRequest)
+		return
+	}
 }
