@@ -200,7 +200,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//Check cache for ip
-		location, found := cache.GetLocation(ip,validatedFields)
+		location, found := cache.GetLocation(ip + validatedLang,validatedFields)
 
 		//If ip found in cache return cached value
 		if found {
@@ -240,12 +240,12 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 
 		//Add to cache if successful request
 		if newLocation.Status == "success" {
-			log.Println("Added: " + ip + " to cache.")
+			log.Println("Added: " + ip + validatedLang + " to cache.")
 			promMetrics.IncrementHandlerRequests("200")
-			cache.AddLocation(ip,newLocation,cacheAge)
+			cache.AddLocation(ip + validatedLang,newLocation,cacheAge)
 			//Re-get request with specified fields
 			promMetrics.IncrementSuccessfulQueries()
-			location, _ = cache.GetLocation(ip,validatedFields)
+			newLocation, _ = cache.GetLocation(ip + validatedLang,validatedFields)
 		}
 
 		//if request failed, increment 400 and fail request counter
@@ -415,9 +415,6 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					validatedSubLang, err = ip_api.ValidateLang(request.Lang)
 				}
 
-				//TODO implement usage of validatedSubLang
-				log.Println(validatedSubLang)
-
 				//init location
 				var location ip_api.Location
 
@@ -432,7 +429,19 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					promMetrics.IncrementHandlerRequests("400")
 				} else {
 					//Check cache for ip
-					location, found := cache.GetLocation(request.Query,validatedSubFields)
+					var location ip_api.Location
+					var found bool
+
+					if validatedSubFields != "" && validatedSubLang != "" {
+						location, found = cache.GetLocation(request.Query + validatedSubLang,validatedSubFields)
+					} else if validatedSubFields != "" {
+						location, found = cache.GetLocation(request.Query + validatedLang,validatedSubFields)
+					} else if validatedSubLang != "" {
+						location, found = cache.GetLocation(request.Query + validatedSubLang,validatedFields)
+					} else {
+						location, found = cache.GetLocation(request.Query + validatedLang,validatedFields)
+					}
+
 
 					//if found in cache add to cached request list
 					if found {
@@ -446,7 +455,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 						notCachedRequestsMap[request.Query] = request
 
 						//set fields to all so that everything is stored in cache
-						request.Fields = strings.Join(ip_api.AllowedAPIFields,",")
+						if request.Fields != "" {
+							request.Fields = strings.Join(ip_api.AllowedAPIFields,",")
+						}
 						notCachedRequests = append(notCachedRequests, request)
 
 					}
@@ -496,21 +507,32 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							notCachedLocations[i].Reverse = names[0]
 						}
 
-						//Store non-cached location in cache and get back proper fields location
-						cache.AddLocation(notCachedLocations[i].Query,notCachedLocations[i],cacheAge)
-						log.Println("Added: " + notCachedLocations[i].Query + " in cache.")
-
-						var fields string
-
-						if requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]; ok {
-							fields = requestMap.Fields
-						} else if validatedFields != "" {
-							fields = validatedFields
+						//set lang value
+						var lang string
+						requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]
+						if ok {
+							if requestMap.Lang != "" {
+								lang = requestMap.Lang
+							} else {
+								lang = validatedLang
+							}
 						} else {
-							fields = ""
+							lang = validatedLang
 						}
 
-						cachedLocation, _ := cache.GetLocation(notCachedLocations[i].Query, fields)
+						//Store non-cached location in cache and get back proper fields location
+						cache.AddLocation(notCachedLocations[i].Query + lang,notCachedLocations[i],cacheAge)
+						log.Println("Added: " + notCachedLocations[i].Query + lang + " in cache.")
+
+						//set fields value
+						var fields string
+						if requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]; ok {
+							fields = requestMap.Fields
+						} else {
+							fields = validatedFields
+						}
+
+						cachedLocation, _ := cache.GetLocation(notCachedLocations[i].Query + lang, fields)
 
 						cachedNewLocations = append(cachedNewLocations,cachedLocation)
 
