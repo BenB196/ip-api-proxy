@@ -40,12 +40,19 @@ func main()  {
 		panic(err)
 	}
 
-	http.HandleFunc("/",ipAIPProxy)
+	//handle single requests
+	http.HandleFunc("/json/",ipAPIJson)
+
+	//handle batch requests
+	http.HandleFunc("/batch",ipAPIBatch)
 
 	if LoadedConfig.Prometheus.Enabled {
 		//Start prometheus metrics end point
 		http.Handle("/metrics",promhttp.Handler())
 	}
+
+	//404 everything else
+	http.HandleFunc("/",ipAIPProxy)
 
 	var clearCacheWg sync.WaitGroup
 
@@ -87,42 +94,28 @@ func main()  {
 	//Listen on port
 	log.Println("Starting server...")
 	if err := http.ListenAndServe(":" + strconv.Itoa(LoadedConfig.Port),nil); err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 }
 
-func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
+func ipAPIJson(w http.ResponseWriter, r *http.Request) {
+	//increment queries processed
+	promMetrics.IncrementQueriesProcessed()
+	//TODO add single increment
+
 	//set content type
 	w.Header().Set("Content-Type","application/json")
 
 	//init location variable
 	location := ip_api.Location{}
 
-	//check to make sure only support sub pages are being used
-	if r.URL.Path != "/json/" && !strings.Contains(r.URL.Path,"/json/")  && r.URL.Path != "/batch" {
-		location.Status = "failed"
-		location.Message = "404 not found."
-		promMetrics.IncrementHandlerRequests("404")
-		jsonLocation, _ := json.Marshal(&location)
-		http.Error(w,string(jsonLocation),http.StatusNotFound)
-		return
-	}
+	//init error
+	var err error
 
+	//Get cacheAge duration
 	cacheAge, _ := time.ParseDuration(LoadedConfig.Cache.Age)
 
-	switch r.Method {
-	case "GET":
-		promMetrics.IncrementQueriesProcessed()
-		//Check to make sure that only json end point is getting GET requests
-		if r.URL.Path != "/json/" && !strings.Contains(r.URL.Path,"/json/") {
-			location.Status = "failed"
-			location.Message = "400 GET requests only supported for /json/."
-			promMetrics.IncrementHandlerRequests("400")
-			jsonLocation, _ := json.Marshal(&location)
-			http.Error(w,string(jsonLocation),http.StatusBadRequest)
-			return
-		}
-
+	if r.Method == "GET" {
 		//check to make sure that there are only 2 or less / in URL
 		if strings.Count(r.URL.Path,"/") > 2 {
 			location.Status = "failed"
@@ -135,7 +128,6 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//get fields values
 		fields, ok := r.URL.Query()["fields"]
-
 		if !ok && len(fields) > 0 {
 			location.Status = "failed"
 			location.Message = "400 invalid fields value."
@@ -147,7 +139,6 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//get lang value
 		lang, ok := r.URL.Query()["lang"]
-
 		if !ok && len(lang) > 0 {
 			location.Status = "failed"
 			location.Message = "400 invalid lang value."
@@ -159,7 +150,6 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//validate fields
 		var validatedFields string
-		var err error
 		if len(fields) > 0 {
 			validatedFields, err = ip_api.ValidateFields(fields[0])
 
@@ -201,7 +191,7 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		if ip == "" {
 			location.Status = "failed"
-			location.Message = "400 query request is blank"
+			location.Message = "400 request is blank"
 			promMetrics.IncrementHandlerRequests("400")
 			jsonLocation, _ := json.Marshal(&location)
 			http.Error(w,string(jsonLocation),http.StatusBadRequest)
@@ -246,16 +236,17 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//Add to cache if successful query
+		//Add to cache if successful request
 		if newLocation.Status == "success" {
 			log.Println("Added: " + ip + " to cache.")
 			promMetrics.IncrementHandlerRequests("200")
 			cache.AddLocation(ip,newLocation,cacheAge)
-			//Re-get query with specified fields
+			//Re-get request with specified fields
 			promMetrics.IncrementSuccessfulQueries()
 			location, _ = cache.GetLocation(ip,validatedFields)
 		}
 
+		//if request failed, increment 400 and fail request counter
 		if newLocation.Status == "failed" {
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedQueries()
@@ -269,18 +260,34 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 		return
-	case "POST":
-		promMetrics.IncrementQueriesProcessed()
-		//check to make sure that only batch end point is getting POST requests
-		if r.URL.Path != "/batch" {
-			location.Status = "failed"
-			location.Message = "400 POST requests only supported for /batch."
-			promMetrics.IncrementHandlerRequests("400")
-			jsonLocation, _ := json.Marshal(&location)
-			http.Error(w,string(jsonLocation),http.StatusBadRequest)
-			return
-		}
+	} else {
+		location.Status = "failed"
+		location.Message = "404, /json/ endpoint only supports GET requests."
+		promMetrics.IncrementHandlerRequests("404")
+		jsonLocation, _ := json.Marshal(&location)
+		http.Error(w,string(jsonLocation),http.StatusBadRequest)
+		return
+	}
+}
 
+func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
+	//increment queries processed
+	promMetrics.IncrementQueriesProcessed()
+	//TODO add batch increment
+
+	//set content type
+	w.Header().Set("Content-Type","application/json")
+
+	//init location variable
+	location := ip_api.Location{}
+
+	//init error
+	var err error
+
+	//Get cacheAge duration
+	cacheAge, _ := time.ParseDuration(LoadedConfig.Cache.Age)
+
+	if r.Method == "POST" {
 		//check to make sure that there are only 1 or less / in URL
 		if strings.Count(r.URL.Path,"/") > 1 {
 			location.Status = "failed"
@@ -293,7 +300,6 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//get fields values
 		fields, ok := r.URL.Query()["fields"]
-
 		if !ok && len(fields) > 0 {
 			location.Status = "failed"
 			location.Message = "400 invalid fields value."
@@ -305,7 +311,6 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//get lang value
 		lang, ok := r.URL.Query()["lang"]
-
 		if !ok && len(lang) > 0 {
 			location.Status = "failed"
 			location.Message = "400 invalid lang value."
@@ -317,7 +322,6 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 
 		//validate fields
 		var validatedFields string
-		var err error
 		if len(fields) > 0 {
 			validatedFields, err = ip_api.ValidateFields(fields[0])
 
@@ -389,103 +393,149 @@ func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		//Loop through queries from post data and handle each query as a single query
-		var wg sync.WaitGroup
-		wg.Add(len(queries))
-		go func() {
-			for _, query := range queries {
-				defer wg.Done()
-				//validate any sub fields
-				if query.Fields != "" {
-					validatedFields, err = ip_api.ValidateFields(query.Fields)
-				}
+		//TODO first check for any requests that are in cache. Only want to forward non-cached requests
 
-				//validate any sub langs
-				if query.Lang != "" {
-					validatedLang, err = ip_api.ValidateLang(query.Lang)
-				}
+		//TODO build batch request of non-cached requests
 
-				//init location
-				var location ip_api.Location
+		//TODO read non-cached requests and perform reverse lookups on successful requests
 
-				//If err on sub fields or sub lang set as failed query status with err in message
-				if err != nil {
-					location.Status = "failed"
-					location.Message = "400 " + err.Error()
-					promMetrics.IncrementHandlerRequests("400")
-				} else if query.Query == "" {
-					location.Status = "failed"
-					location.Message = "400 query request is blank"
-					promMetrics.IncrementHandlerRequests("400")
-				} else {
-					//Check cache for ip
-					location, found := cache.GetLocation(query.Query,validatedFields)
+		//TODO store non-cached requests in cache and get back proper fields requests
 
-					//If ip found in cache return cached value
-					if found {
-						log.Println("Found: " + query.Query + " in cache.")
-						promMetrics.IncrementHandlerRequests("200")
-						//Append query to location list
-						locations = append(locations, location)
-					}
-
-					//execute query
-					if !found {
-						//Build query
-						queryStruct := ip_api.Query{
-							Queries:[]ip_api.QueryIP{
-								{Query:query.Query},
-							},
-							Fields:strings.Join(ip_api.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
-							Lang:validatedLang,
-						}
-
-						promMetrics.IncrementQueriesForwarded()
-						location, err = ip_api.SingleQuery(queryStruct,key,"")
-
-						if err != nil {
-							location = ip_api.Location{}
-							location.Status = "failed"
-							location.Message = "400 " + err.Error()
-							promMetrics.IncrementHandlerRequests("400")
-						}
-
-						//Add to cache if successful query
-						if location.Status == "success" {
-							log.Println("Added: " + query.Query + " to cache.")
-							cache.AddLocation(query.Query,location,cacheAge)
-							//Re-get query with specified fields
-							promMetrics.IncrementHandlerRequests("200")
-							promMetrics.IncrementSuccessfulQueries()
-							location, _ = cache.GetLocation(query.Query,validatedFields)
-						}
-
-						if location.Status == "failed" {
-							promMetrics.IncrementHandlerRequests("400")
-							promMetrics.IncrementFailedQueries()
-						}
-
-						//Append query to location list
-						locations = append(locations, location)
-					}
-				}
-			}
-		}()
-
-		wg.Wait()
-
-		//return query as an array
-		jsonLocations, _ := json.Marshal(&locations)
-		w.WriteHeader(http.StatusOK)
-		_, err = w.Write(jsonLocations)
-		if err != nil {
-			log.Fatal(err)
-		}
+		//TODO merge new requests with cached requests and return all
+	} else {
+		location.Status = "failed"
+		location.Message = "404, /batch endpoint only supports POST requests."
+		promMetrics.IncrementHandlerRequests("404")
+		jsonLocation, _ := json.Marshal(&location)
+		http.Error(w,string(jsonLocation),http.StatusBadRequest)
 		return
+	}
+}
+
+func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
+
+
+
+	switch r.Method {
+	case "POST":
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		//Loop through queries from post data and handle each query as a single query
+		//var wg sync.WaitGroup
+		//wg.Add(len(queries))
+		//go func() {
+		//	for _, query := range queries {
+		//		defer wg.Done()
+		//		//validate any sub fields
+		//		if query.Fields != "" {
+		//			validatedFields, err = ip_api.ValidateFields(query.Fields)
+		//		}
+//
+		//		//validate any sub langs
+		//		if query.Lang != "" {
+		//			validatedLang, err = ip_api.ValidateLang(query.Lang)
+		//		}
+//
+		//		//init location
+		//		var location ip_api.Location
+//
+		//		//If err on sub fields or sub lang set as failed query status with err in message
+		//		if err != nil {
+		//			location.Status = "failed"
+		//			location.Message = "400 " + err.Error()
+		//			promMetrics.IncrementHandlerRequests("400")
+		//		} else if query.Query == "" {
+		//			location.Status = "failed"
+		//			location.Message = "400 query request is blank"
+		//			promMetrics.IncrementHandlerRequests("400")
+		//		} else {
+		//			//Check cache for ip
+		//			location, found := cache.GetLocation(query.Query,validatedFields)
+//
+		//			//If ip found in cache return cached value
+		//			if found {
+		//				log.Println("Found: " + query.Query + " in cache.")
+		//				promMetrics.IncrementHandlerRequests("200")
+		//				//Append query to location list
+		//				locations = append(locations, location)
+		//			}
+//
+		//			//execute query
+		//			if !found {
+		//				//Build query
+		//				queryStruct := ip_api.Query{
+		//					Queries:[]ip_api.QueryIP{
+		//						{Query:query.Query},
+		//					},
+		//					Fields:strings.Join(ip_api.AllowedAPIFields,","), //Execute query to IP API for all fields, handle field selection later
+		//					Lang:validatedLang,
+		//				}
+//
+		//				promMetrics.IncrementQueriesForwarded()
+		//				location, err = ip_api.SingleQuery(queryStruct,key,"")
+//
+		//				if err != nil {
+		//					location = ip_api.Location{}
+		//					location.Status = "failed"
+		//					location.Message = "400 " + err.Error()
+		//					promMetrics.IncrementHandlerRequests("400")
+		//				}
+//
+		//				//Add to cache if successful query
+		//				if location.Status == "success" {
+		//					log.Println("Added: " + query.Query + " to cache.")
+		//					cache.AddLocation(query.Query,location,cacheAge)
+		//					//Re-get query with specified fields
+		//					promMetrics.IncrementHandlerRequests("200")
+		//					promMetrics.IncrementSuccessfulQueries()
+		//					location, _ = cache.GetLocation(query.Query,validatedFields)
+		//				}
+//
+		//				if location.Status == "failed" {
+		//					promMetrics.IncrementHandlerRequests("400")
+		//					promMetrics.IncrementFailedQueries()
+		//				}
+//
+		//				//Append query to location list
+		//				locations = append(locations, location)
+		//			}
+		//		}
+		//	}
+		//}()
+//
+		//wg.Wait()
+//
+		////return query as an array
+		//jsonLocations, _ := json.Marshal(&locations)
+		//w.WriteHeader(http.StatusOK)
+		//_, err = w.Write(jsonLocations)
+		//if err != nil {
+		//	log.Fatal(err)
+		//}
+		//return
 	default:
 		var location ip_api.Location
 		location.Status = "failed"
-		location.Message = "404, server only supports GET and POST requests."
+		location.Message = "404, server only supports GET (/json/ endpoint) and POST (/batch endpoint) requests."
 		promMetrics.IncrementHandlerRequests("404")
 		jsonLocation, _ := json.Marshal(&location)
 		http.Error(w,string(jsonLocation),http.StatusBadRequest)
