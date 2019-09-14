@@ -279,8 +279,6 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 }
 
 func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
-	//increment queries processed
-	promMetrics.IncrementQueriesProcessed()
 	//TODO add batch increment
 
 	//set content type
@@ -452,7 +450,11 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					//if found in cache add to cached request list
 					if found {
 						promMetrics.IncrementCacheHits()
+						promMetrics.IncrementSuccessfulQueries()
+						promMetrics.IncrementSuccessfulBatchQueries()
 						log.Println("Found: " + request.Query + " in cache.")
+						//increment queries processed
+						promMetrics.IncrementQueriesProcessed()
 						cachedLocations = append(cachedLocations, location)
 					} else {
 						//if not found in cache add to not cache request list
@@ -553,6 +555,8 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							promMetrics.IncrementFailedQueries()
 							promMetrics.IncrementFailedBatchQueries()
 						}
+						//increment queries processed
+						promMetrics.IncrementQueriesProcessed()
 						wg.Done()
 					}
 				}()
