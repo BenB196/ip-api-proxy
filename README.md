@@ -103,9 +103,15 @@ The following are the currently supported metrics outside of the standard Golang
 # HELP ip_api_proxy_cache_hits_total The total number of times that cache has served up a request
 # TYPE ip_api_proxy_cache_hits_total counter
 ip_api_proxy_cache_hits_total 0
+# HELP ip_api_proxy_failed_batch_queries_total The total number of failed batch queries
+# TYPE ip_api_proxy_failed_batch_queries_total counter
+ip_api_proxy_failed_batch_queries_total 0
 # HELP ip_api_proxy_failed_queries_total The total number of failed queries
 # TYPE ip_api_proxy_failed_queries_total counter
 ip_api_proxy_failed_queries_total 0
+# HELP ip_api_proxy_failed_single_queries_total The total number of failed single queries
+# TYPE ip_api_proxy_failed_single_queries_total counter
+ip_api_proxy_failed_single_queries_total 0
 # HELP ip_api_proxy_handler_requests_total Total number of requests by HTTP status code
 # TYPE ip_api_proxy_handler_requests_total counter
 ip_api_proxy_handler_requests_total{code="200"} 0
@@ -123,9 +129,15 @@ ip_api_proxy_queries_in_cache 0
 # HELP ip_api_proxy_queries_total The total number of queries processed
 # TYPE ip_api_proxy_queries_total counter
 ip_api_proxy_queries_total 0
+# HELP ip_api_proxy_successful_batch_queries_total The total number of successfully fulfilled batch queries
+# TYPE ip_api_proxy_successful_batch_queries_total counter
+ip_api_proxy_successful_batch_queries_total 0
 # HELP ip_api_proxy_successful_queries_total The total number of successfully fulfilled queries
 # TYPE ip_api_proxy_successful_queries_total counter
 ip_api_proxy_successful_queries_total 0
+# HELP ip_api_proxy_successful_single_queries_total The total number of successfully fulfilled single queries
+# TYPE ip_api_proxy_successful_single_queries_total counter
+ip_api_proxy_successful_single_queries_total 0
 ```
 
 If you have ideas for other metrics which you feel would be useful, please let me know.
