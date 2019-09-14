@@ -30,9 +30,25 @@ var (
 		Name: "ip_api_proxy_successful_queries_total",
 		Help: "The total number of successfully fulfilled queries",
 	})
+	successfulBatchQueries = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ip_api_proxy_successful_batch_queries_total",
+		Help: "The total number of successfully fulfilled batch queries",
+	})
+	successfulSingleQueries = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ip_api_proxy_successful_single_queries_total",
+		Help: "The total number of successfully fulfilled single queries",
+	})
 	failedQueries = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "ip_api_proxy_failed_queries_total",
 		Help: "The total number of failed queries",
+	})
+	failedBatchQueries = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ip_api_proxy_failed_batch_queries_total",
+		Help: "The total number of failed batch queries",
+	})
+	failedSingleQueries = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ip_api_proxy_failed_single_queries_total",
+		Help: "The total number of failed single queries",
 	})
 	handlerRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "ip_api_proxy_handler_requests_total",
@@ -70,8 +86,24 @@ func IncrementSuccessfulQueries()  {
 	successfulQueries.Inc()
 }
 
+func IncrementSuccessfulBatchQueries() {
+	successfulBatchQueries.Inc()
+}
+
+func IncrementSuccessfulSingeQueries() {
+	successfulSingleQueries.Inc()
+}
+
 func IncrementFailedQueries()  {
 	failedQueries.Inc()
+}
+
+func IncrementFailedBatchQueries() {
+	failedBatchQueries.Inc()
+}
+
+func IncrementFailedSingleQueries() {
+	failedSingleQueries.Inc()
 }
 
 func IncrementHandlerRequests(code string)  {

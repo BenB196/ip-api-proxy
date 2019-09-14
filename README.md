@@ -11,9 +11,7 @@ The only difference with value returns with the proxy API is that when a query f
 ## Important Notes
 
 1. This proxy is not intended to bypass IP-API's request limit of [150 requests per minute](http://ip-api.com/docs/api:json) on the free API URL. In fact there are no checks in this application to make sure that you never hit this limit, it just goes full throttle all the time. If you need to make more than 150 requests per minute, just buy the Pro service, its inexpensive.
-2. Batch requests are handled differently with this proxy then you would expect when compared to the normal [IP-API batch](http://ip-api.com/docs/api:batch) request. This proxy will break apart a batch request it receives and execute each request individually. This means that if you are using the free API URL, you need to be conscious of how many requests will actually be made from a request. The reason for this can be found [here](https://github.com/BenB196/ip-api-go-pkg), but the here is also the quote:
-
-> An observation about the batch query. It sometime appears to return less data then the single query on the exact same query even when the same fields are passed. This is something that appears to be on the IP-API end, not the package end.
+2. Batch requests are handled differently with this proxy then you would expect when compared to the normal [IP-API batch](http://ip-api.com/docs/api:batch) request. This proxy will provide reverse records if you pass the reverse field value through a batch query.
 
 ## Install
 ### Build from Source

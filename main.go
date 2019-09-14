@@ -207,6 +207,8 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			log.Println("Found: " + ip + " in cache.")
 			promMetrics.IncrementHandlerRequests("200")
 			promMetrics.IncrementCacheHits()
+			promMetrics.IncrementSuccessfulQueries()
+			promMetrics.IncrementSuccessfulSingeQueries()
 			jsonLocation, err :=json.Marshal(location)
 			w.WriteHeader(http.StatusOK)
 			_, err = w.Write(jsonLocation)
@@ -244,14 +246,16 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			promMetrics.IncrementHandlerRequests("200")
 			cache.AddLocation(ip + validatedLang,newLocation,cacheAge)
 			//Re-get request with specified fields
-			promMetrics.IncrementSuccessfulQueries()
 			newLocation, _ = cache.GetLocation(ip + validatedLang,validatedFields)
+			promMetrics.IncrementSuccessfulQueries()
+			promMetrics.IncrementSuccessfulSingeQueries()
 		}
 
 		//if request failed, increment 400 and fail request counter
 		if newLocation.Status == "failed" {
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedQueries()
+			promMetrics.IncrementFailedSingleQueries()
 		}
 
 		//return query
@@ -495,47 +499,58 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 				wg.Add(len(notCachedLocations))
 				go func() {
 					for i, location := range notCachedLocations {
-						names, err := net.LookupAddr(location.Query)
+						if location.Status != "failed" {
+							names, err := net.LookupAddr(location.Query)
 
-						if err != nil {
-							notCachedLocations[i].Status = "failed"
-							notCachedLocations[i].Message = "400 reverse lookup failed" + err.Error()
-							promMetrics.IncrementHandlerRequests("400")
-						}
-
-						if len(names) > 0 {
-							notCachedLocations[i].Reverse = names[0]
-						}
-
-						//set lang value
-						var lang string
-						requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]
-						if ok {
-							if requestMap.Lang != "" {
-								lang = requestMap.Lang
+							if err != nil {
+								notCachedLocations[i].Status = "failed"
+								notCachedLocations[i].Message = "400 reverse lookup failed: " + err.Error()
+								promMetrics.IncrementHandlerRequests("400")
+								promMetrics.IncrementFailedQueries()
+								promMetrics.IncrementFailedBatchQueries()
+								cachedNewLocations = append(cachedNewLocations,location)
 							} else {
-								lang = validatedLang
+								if len(names) > 0 {
+									notCachedLocations[i].Reverse = names[0]
+								}
+
+								//set lang value
+								var lang string
+								requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]
+								if ok {
+									if requestMap.Lang != "" {
+										lang = requestMap.Lang
+									} else {
+										lang = validatedLang
+									}
+								} else {
+									lang = validatedLang
+								}
+
+								//Store non-cached location in cache and get back proper fields location
+								cache.AddLocation(notCachedLocations[i].Query + lang,notCachedLocations[i],cacheAge)
+								log.Println("Added: " + notCachedLocations[i].Query + lang + " in cache.")
+
+								//set fields value
+								var fields string
+								if requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]; ok {
+									fields = requestMap.Fields
+								} else {
+									fields = validatedFields
+								}
+
+								cachedLocation, _ := cache.GetLocation(notCachedLocations[i].Query + lang, fields)
+
+								cachedNewLocations = append(cachedNewLocations,cachedLocation)
+
+								promMetrics.IncrementSuccessfulQueries()
+								promMetrics.IncrementSuccessfulBatchQueries()
 							}
 						} else {
-							lang = validatedLang
+							cachedNewLocations = append(cachedNewLocations,location)
+							promMetrics.IncrementFailedQueries()
+							promMetrics.IncrementFailedBatchQueries()
 						}
-
-						//Store non-cached location in cache and get back proper fields location
-						cache.AddLocation(notCachedLocations[i].Query + lang,notCachedLocations[i],cacheAge)
-						log.Println("Added: " + notCachedLocations[i].Query + lang + " in cache.")
-
-						//set fields value
-						var fields string
-						if requestMap, ok := notCachedRequestsMap[notCachedLocations[i].Query]; ok {
-							fields = requestMap.Fields
-						} else {
-							fields = validatedFields
-						}
-
-						cachedLocation, _ := cache.GetLocation(notCachedLocations[i].Query + lang, fields)
-
-						cachedNewLocations = append(cachedNewLocations,cachedLocation)
-
 						wg.Done()
 					}
 				}()
@@ -547,8 +562,6 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		if len(cachedNewLocations) > 0 {
 			cachedLocations = append(cachedLocations, cachedNewLocations...)
 		}
-
-		promMetrics.IncrementSuccessfulQueries()
 
 		//return query
 		jsonLocation, _ := json.Marshal(cachedLocations)
