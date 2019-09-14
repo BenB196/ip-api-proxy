@@ -49,8 +49,6 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ip_api.AllowedAPIFields) {
-			promMetrics.IncrementCacheHits()
-			promMetrics.IncrementSuccessfulQueries()
 			return record.Location, true
 		} else {
 			fieldSlice := strings.Split(fields,",")
@@ -105,8 +103,6 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 			}
 		}
 		//Return location
-		promMetrics.IncrementCacheHits()
-		promMetrics.IncrementSuccessfulQueries()
 		return location, true
 	}
 	//record not found in cache return false
