@@ -567,6 +567,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 
 		//return query
 		jsonLocation, _ := json.Marshal(cachedLocations)
+		promMetrics.IncrementHandlerRequests("200")
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(jsonLocation)
 		if err != nil {
