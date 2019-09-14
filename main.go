@@ -267,12 +267,14 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	} else {
-		location.Status = "failed"
-		location.Message = "404, /json/ endpoint only supports GET requests."
-		promMetrics.IncrementHandlerRequests("404")
-		jsonLocation, _ := json.Marshal(&location)
-		http.Error(w,string(jsonLocation),http.StatusBadRequest)
-		return
+		if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
+			location.Status = "failed"
+			location.Message = "404, /json/ endpoint only supports GET requests."
+			promMetrics.IncrementHandlerRequests("404")
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w, string(jsonLocation), http.StatusBadRequest)
+			return
+		}
 	}
 }
 
@@ -572,12 +574,14 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	} else {
-		location.Status = "failed"
-		location.Message = "404, /batch endpoint only supports POST requests."
-		promMetrics.IncrementHandlerRequests("404")
-		jsonLocation, _ := json.Marshal(&location)
-		http.Error(w,string(jsonLocation),http.StatusBadRequest)
-		return
+		if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
+			location.Status = "failed"
+			location.Message = "404, /batch endpoint only supports POST requests."
+			promMetrics.IncrementHandlerRequests("404")
+			jsonLocation, _ := json.Marshal(&location)
+			http.Error(w, string(jsonLocation), http.StatusBadRequest)
+			return
+		}
 	}
 }
 
