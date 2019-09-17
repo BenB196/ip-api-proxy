@@ -22,7 +22,7 @@ import (
 //Init config globally
 var LoadedConfig = config.Config{}
 
-var IPDNSRegexp = regexp.MustCompile(`((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}|(([a-zA-Z])|([a-zA-Z][a-zA-Z])|([a-zA-Z][0-9])|([0-9][a-zA-Z])|([a-zA-Z0-9][a-zA-Z0-9-_]{1,61}[a-zA-Z0-9]))\.([a-zA-Z]{2,6}|[a-zA-Z0-9-]{2,30}\.[a-zA-Z]{2,3}))`)
+var IPDNSRegexp = regexp.MustCompile(`(((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|(([a-zA-Z])|([a-zA-Z][a-zA-Z])|([a-zA-Z][0-9])|([0-9][a-zA-Z])|([a-zA-Z0-9][a-zA-Z0-9-_]{1,61}[a-zA-Z0-9]))\.([a-zA-Z]{2,6}|[a-zA-Z0-9-]{2,30}\.[a-zA-Z]{2,3})|(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]+|::(ffff(:0{1,4})?:)?((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1?[0-9])?[0-9])\.){3}(25[0-5]|(2[0-4]|1?[0-9])?[0-9])))`)
 
 func main()  {
 	var err error
@@ -122,8 +122,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		//check to make sure that there are only 2 or less / in URL
 		if strings.Count(r.URL.Path,"/") > 2 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 expected one (1) or (2) \"/\" but got more."
+			log.Println("Failed single request: 400 expected one (1) or (2) \"/\" but got more.")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedSingleRequests()
@@ -135,8 +136,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		//get fields values
 		fields, ok := r.URL.Query()["fields"]
 		if !ok && len(fields) > 0 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 invalid fields value."
+			log.Println("Failed single request: 400 invalid fields value.")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedSingleRequests()
@@ -148,8 +150,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		//get lang value
 		lang, ok := r.URL.Query()["lang"]
 		if !ok && len(lang) > 0 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 invalid lang value."
+			log.Println("Failed single request: 400 invalid lang value.")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedSingleRequests()
@@ -164,8 +167,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			validatedFields, err = ip_api.ValidateFields(fields[0])
 
 			if err != nil {
-				location.Status = "failed"
+				location.Status = "fail"
 				location.Message = "400 " + err.Error()
+				log.Println("Failed single request: 400 " + err.Error())
 				promMetrics.IncrementHandlerRequests("400")
 				promMetrics.IncrementFailedRequests()
 				promMetrics.IncrementFailedSingleRequests()
@@ -181,8 +185,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			validatedLang, err = ip_api.ValidateLang(lang[0])
 
 			if err != nil {
-				location.Status = "failed"
+				location.Status = "fail"
 				location.Message = "400 " + err.Error()
+				log.Println("Failed single request: 400 " + err.Error())
 				promMetrics.IncrementHandlerRequests("400")
 				promMetrics.IncrementFailedRequests()
 				promMetrics.IncrementFailedSingleRequests()
@@ -204,8 +209,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		ip := IPDNSRegexp.FindString(r.URL.Path)
 
 		if ip == "" {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 request is blank"
+			log.Println("Failed single request: 400 request is blank")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedSingleRequests()
@@ -248,8 +254,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		newLocation, err := ip_api.SingleQuery(query,key,"")
 
 		if err != nil {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 " + err.Error()
+			log.Println("Failed single request: 400 " + err.Error())
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedSingleRequests()
@@ -271,6 +278,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 
 		//if request failed, increment 400 and fail request counter
 		if newLocation.Status == "failed" {
+			log.Println("Failed single query: " + ip)
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedQueries()
 			promMetrics.IncrementFailedSingleQueries()
@@ -286,8 +294,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "404, /json/ endpoint only supports GET requests."
+			log.Println("Failed single request: 404, /json/ endpoint only supports GET requests.")
 			promMetrics.IncrementHandlerRequests("404")
 			jsonLocation, _ := json.Marshal(&location)
 			http.Error(w, string(jsonLocation), http.StatusBadRequest)
@@ -316,8 +325,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		//check to make sure that there are only 1 or less / in URL
 		if strings.Count(r.URL.Path,"/") > 1 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 expected one (1) \"/\" but got more."
+			log.Println("Failed batch request: 400 expected one (1) \"/\" but got more.")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedBatchRequests()
@@ -329,8 +339,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		//get fields values
 		fields, ok := r.URL.Query()["fields"]
 		if !ok && len(fields) > 0 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 invalid fields value."
+			log.Println("Failed batch request: 400 invalid fields value.")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedBatchRequests()
@@ -342,8 +353,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		//get lang value
 		lang, ok := r.URL.Query()["lang"]
 		if !ok && len(lang) > 0 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 invalid lang value."
+			log.Println("Failed batch request: 400 invalid lang value.")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedBatchRequests()
@@ -358,8 +370,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			validatedFields, err = ip_api.ValidateFields(fields[0])
 
 			if err != nil {
-				location.Status = "failed"
+				location.Status = "fail"
 				location.Message = "400 " + err.Error()
+				log.Println("Failed batch request: 400 " + err.Error())
 				promMetrics.IncrementHandlerRequests("400")
 				promMetrics.IncrementFailedRequests()
 				promMetrics.IncrementFailedBatchRequests()
@@ -375,8 +388,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			validatedLang, err = ip_api.ValidateLang(lang[0])
 
 			if err != nil {
-				location.Status = "failed"
+				location.Status = "fail"
 				location.Message = "400 " + err.Error()
+				log.Println("Failed batch request: 400 " + err.Error())
 				promMetrics.IncrementHandlerRequests("400")
 				promMetrics.IncrementFailedRequests()
 				promMetrics.IncrementFailedBatchRequests()
@@ -397,8 +411,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		//Read body data
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 " + err.Error()
+			log.Println("Failed batch request: 400 " + err.Error())
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedBatchRequests()
@@ -411,8 +426,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		var requests []ip_api.QueryIP
 		err = json.Unmarshal(body,&requests)
 		if err != nil {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 " + err.Error()
+			log.Println("Failed batch request: 400 " + err.Error())
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedBatchRequests()
@@ -423,8 +439,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 
 		//validate the queries were actually passed
 		if len(requests) == 0 {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "400 no queries passed"
+			log.Println("Failed batch request: 400 no queries passed")
 			promMetrics.IncrementHandlerRequests("400")
 			promMetrics.IncrementFailedRequests()
 			promMetrics.IncrementFailedBatchRequests()
@@ -464,18 +481,20 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 
 				//If err on sub fields or sub lang set as failed query status with err in message
 				if err != nil {
-					location.Status = "failed"
+					location.Status = "fail"
 					location.Message = "400 " + err.Error()
 					location.Query = request.Query
 					cachedLocations = append(cachedLocations, location) //Even though they aren't cached, we don't want to execute these as they are bad
+					log.Println("Failed batch query: " + request.Query + " 400 " + err.Error())
 					promMetrics.IncrementHandlerRequests("400")
 					promMetrics.IncrementFailedQueries()
 					promMetrics.IncrementFailedBatchQueries()
 				} else if request.Query == "" {
-					location.Status = "failed"
+					location.Status = "fail"
 					location.Message = "400 request is blank"
 					location.Query = request.Query
 					cachedLocations = append(cachedLocations, location) //Even though they aren't cached, we don't want to execute these as they are bad
+					log.Println("Failed batch query: " + request.Query + " 400 request is blank")
 					promMetrics.IncrementHandlerRequests("400")
 					promMetrics.IncrementFailedQueries()
 					promMetrics.IncrementFailedBatchQueries()
@@ -536,8 +555,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			notCachedLocations, err = ip_api.BatchQuery(batchQuery,key,"")
 
 			if err != nil {
-				location.Status = "failed"
+				location.Status = "fail"
 				location.Message = "400 " + err.Error()
+				log.Println("Failed batch request: 400 " + err.Error())
 				promMetrics.IncrementHandlerRequests("400")
 				promMetrics.IncrementFailedRequests()
 				promMetrics.IncrementFailedBatchRequests()
@@ -588,6 +608,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							promMetrics.IncrementSuccessfulBatchQueries()
 						} else {
 							cachedNewLocations = append(cachedNewLocations, location)
+							log.Println("Failed query: " + location.Query)
 							promMetrics.IncrementFailedQueries()
 							promMetrics.IncrementFailedBatchQueries()
 						}
@@ -614,8 +635,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
-			location.Status = "failed"
+			location.Status = "fail"
 			location.Message = "404, /batch endpoint only supports POST requests."
+			log.Println("404, /batch endpoint only supports POST requests.")
 			promMetrics.IncrementHandlerRequests("404")
 			jsonLocation, _ := json.Marshal(&location)
 			http.Error(w, string(jsonLocation), http.StatusBadRequest)
@@ -627,8 +649,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 func ipAIPProxy(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
 		var location ip_api.Location
-		location.Status = "failed"
+		location.Status = "fail"
 		location.Message = "404, server only supports GET (/json/ endpoint) and POST (/batch endpoint) requests."
+		log.Println("404, server only supports GET (/json/ endpoint) and POST (/batch endpoint) requests.")
 		promMetrics.IncrementHandlerRequests("404")
 		jsonLocation, _ := json.Marshal(&location)
 		http.Error(w,string(jsonLocation),http.StatusBadRequest)
