@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type Record struct {
 }
 
 var RecordCache = map[string]Record{}
+var RecordCacheMutex = sync.RWMutex{}
 
 /*
 GetLocation - function for getting the location of a query from cache
@@ -31,7 +33,9 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 	//Check if record exists in cache map
+	RecordCacheMutex.RLock()
 	if record, found := RecordCache[query]; found {
+		RecordCacheMutex.RUnlock()
 		//Check if record has not expired
 		if time.Now().In(loc).Sub(record.ExpirationTime) > 0 {
 			//Remove record if expired and return false
@@ -104,6 +108,8 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 		}
 		//Return location
 		return location, true
+	} else {
+		RecordCacheMutex.RUnlock()
 	}
 	//record not found in cache return false
 	return ip_api.Location{},false
@@ -123,10 +129,12 @@ func AddLocation(query string,location ip_api.Location, expirationDuration time.
 	expirationTime := time.Now().In(loc).Add(expirationDuration)
 
 	//Create and Add record to cache
+	RecordCacheMutex.Lock()
 	RecordCache[query] = Record{
 		ExpirationTime: expirationTime,
 		Location:       location,
 	}
+	RecordCacheMutex.Unlock()
 	promMetrics.IncrementQueriesCachedTotal()
 	promMetrics.IncrementQueriesCachedCurrent()
 }
@@ -142,12 +150,14 @@ func CleanUpCache() {
 	//get time.Now
 	currentTime := time.Now().In(loc)
 
-	//Loop through map and remove expired times
+	//Loop through map and remove expired time
 	for query, record := range RecordCache {
+		RecordCacheMutex.Lock()
 		if currentTime.Sub(record.ExpirationTime) > 0 {
 			promMetrics.DecreaseQueriesCachedCurrent()
 			delete(RecordCache,query)
 		}
+		RecordCacheMutex.Unlock()
 	}
 	log.Println("Finished Cache Clean Up")
 }
@@ -178,7 +188,9 @@ func WriteCache(writeLocation *string) {
 	e := gob.NewEncoder(file)
 
 	//encode cache
+	RecordCacheMutex.RLock()
 	err = e.Encode(RecordCache)
+	RecordCacheMutex.RUnlock()
 
 	if err != nil {
 		panic(err)
@@ -222,7 +234,9 @@ func ReadCache(writeLocation *string) {
 			cacheDecoder := gob.NewDecoder(cacheFile)
 
 			//decode cache data
+			RecordCacheMutex.Lock()
 			err = cacheDecoder.Decode(&RecordCache)
+			RecordCacheMutex.Unlock()
 
 			if err != nil {
 				panic(err)
