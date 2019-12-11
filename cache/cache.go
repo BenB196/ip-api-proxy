@@ -1,14 +1,12 @@
 package cache
 
 import (
-	"encoding/gob"
-	"errors"
+	"encoding/json"
 	"github.com/BenB196/ip-api-go-pkg"
 	"github.com/BenB196/ip-api-proxy/promMetrics"
+	"github.com/VictoriaMetrics/fastcache"
 	"log"
-	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -17,8 +15,7 @@ type Record struct {
 	Location		ip_api.Location	`json:"location"`
 }
 
-var RecordCache = map[string]Record{}
-var RecordCacheMutex = sync.RWMutex{}
+var FastCacheCache *fastcache.Cache
 
 /*
 GetLocation - function for getting the location of a query from cache
@@ -29,19 +26,25 @@ returns
 ip_api Location
 error
  */
-func GetLocation(query string, fields string) (ip_api.Location,bool) {
+func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
-	//Check if record exists in cache map
-	RecordCacheMutex.RLock()
-	if record, found := RecordCache[query]; found {
-		RecordCacheMutex.RUnlock()
+	queryBytes := []byte(query)
+	//Check if record exists in cache
+	if recordBytes, found := FastCacheCache.HasGet(nil, queryBytes); found {
+		//convert record bytes to record
+		var record Record
+		err := json.Unmarshal(recordBytes, &record)
+
+		if err != nil {
+			return ip_api.Location{}, false, err
+		}
 		//Check if record has not expired
 		if time.Now().In(loc).Sub(record.ExpirationTime) > 0 {
 			//Remove record if expired and return false
 			promMetrics.DecreaseQueriesCachedCurrent()
-			delete(RecordCache,query)
-			return ip_api.Location{},false
+			FastCacheCache.Del(queryBytes)
+			return ip_api.Location{}, false, nil
 		}
 
 		location := ip_api.Location{}
@@ -53,7 +56,7 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ip_api.AllowedAPIFields) {
-			return record.Location, true
+			return record.Location, true, nil
 		} else {
 			fieldSlice := strings.Split(fields,",")
 			//Loop through fields and set selected fields
@@ -107,12 +110,10 @@ func GetLocation(query string, fields string) (ip_api.Location,bool) {
 			}
 		}
 		//Return location
-		return location, true
-	} else {
-		RecordCacheMutex.RUnlock()
+		return location, true, nil
 	}
 	//record not found in cache return false
-	return ip_api.Location{},false
+	return ip_api.Location{}, false, nil
 }
 
 /*
@@ -121,45 +122,31 @@ query - IP/DNS value
 location - ip_api location
 expirationDuration - duration in which the query will expire (go stale)
  */
-func AddLocation(query string,location ip_api.Location, expirationDuration time.Duration) {
+func AddLocation(query string, location ip_api.Location, expirationDuration time.Duration) (bool, error) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 
 	//Get expiration time
 	expirationTime := time.Now().In(loc).Add(expirationDuration)
 
-	//Create and Add record to cache
-	RecordCacheMutex.Lock()
-	RecordCache[query] = Record{
+	//marshal record
+	record := Record{
 		ExpirationTime: expirationTime,
 		Location:       location,
 	}
-	RecordCacheMutex.Unlock()
+	locationBytes, err := json.Marshal(record)
+
+	if err != nil {
+		return false, err
+	}
+
+	//Create and Add record to cache
+	FastCacheCache.Set([]byte(query), locationBytes)
+
 	promMetrics.IncrementQueriesCachedTotal()
 	promMetrics.IncrementQueriesCachedCurrent()
-}
 
-/*
-CleanUpCache - function which removes expired (stale) query/locations from the Cache
- */
-func CleanUpCache() {
-	log.Println("Starting Cache Clean Up")
-	//set timezone
-	loc, _ := time.LoadLocation("UTC")
-
-	//get time.Now
-	currentTime := time.Now().In(loc)
-
-	//Loop through map and remove expired time
-	for query, record := range RecordCache {
-		RecordCacheMutex.Lock()
-		if currentTime.Sub(record.ExpirationTime) > 0 {
-			promMetrics.DecreaseQueriesCachedCurrent()
-			delete(RecordCache,query)
-		}
-		RecordCacheMutex.Unlock()
-	}
-	log.Println("Finished Cache Clean Up")
+	return true, nil
 }
 
 /*
@@ -171,30 +158,12 @@ func WriteCache(writeLocation *string) {
 	//create file name
 	fileName := *writeLocation + "cache.gob"
 
-	//create cache file
-	file, err := os.Create(fileName)
-
-	defer func() {
-		if err := file.Close(); err != nil {
-			panic(errors.New("error: closing file: " + fileName + " " + err.Error()))
-		}
-	}()
+	err := FastCacheCache.SaveToFile(fileName)
 
 	if err != nil {
 		panic(err)
 	}
 
-	//gob encoder
-	e := gob.NewEncoder(file)
-
-	//encode cache
-	RecordCacheMutex.RLock()
-	err = e.Encode(RecordCache)
-	RecordCacheMutex.RUnlock()
-
-	if err != nil {
-		panic(err)
-	}
 	log.Println("Finished Cache Write")
 }
 
@@ -206,41 +175,5 @@ func ReadCache(writeLocation *string) {
 	//create filename
 	fileName := *writeLocation + "cache.gob"
 
-	//read file data
-	cacheFile, err := os.Open(fileName)
-
-	if err != nil {
-		//If file does not exist create one
-		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
-			WriteCache(writeLocation)
-		} else {
-			panic(err)
-		}
-	} else {
-		defer func() {
-			if err := cacheFile.Close(); err != nil {
-				panic(errors.New("error: closing file: " + fileName + " " + err.Error()))
-			}
-		}()
-		//check if file size > 0
-		fstat, err := cacheFile.Stat()
-
-		if err != nil {
-			panic(err)
-		}
-
-		if fstat.Size() > 0 {
-			//create decode
-			cacheDecoder := gob.NewDecoder(cacheFile)
-
-			//decode cache data
-			RecordCacheMutex.Lock()
-			err = cacheDecoder.Decode(&RecordCache)
-			RecordCacheMutex.Unlock()
-
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
+	FastCacheCache = fastcache.LoadFromFileOrNew(fileName, 32000000)
 }

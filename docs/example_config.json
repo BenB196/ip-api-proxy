@@ -1,7 +1,6 @@
 {
   "cache": {
     "persist": false,
-    "cleanInterval": "30m",
     "writeInterval": "30m",
     "writeLocation": "",
     "age": "24h"
