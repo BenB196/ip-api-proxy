@@ -20,7 +20,6 @@ type Config struct {
 
 type Cache struct {
 	Persist			bool	`json:"persist,omitempty"`
-	CleanInterval	string	`json:"cleanInterval,omitempty"`
 	WriteInterval	string	`json:"writeInterval,omitempty"`
 	WriteLocation	string	`json:"writeLocation,omitempty"`
 	Age				string	`json:"age,omitempty"`
@@ -82,17 +81,6 @@ func ReadConfig(configLocation string) (Config,error) {
 	}
 
 	//validate cache
-	//validate clean interval
-	if config.Cache.CleanInterval != "" {
-		_, err = time.ParseDuration(config.Cache.CleanInterval)
-
-		if err != nil {
-			return Config{}, errors.New("error: parsing clean interval duration: " + err.Error())
-		}
-	} else {
-		//set to default of 30 minutes
-		config.Cache.CleanInterval = "30m"
-	}
 
 	//only validate write interval and location if cache persist is true
 	if config.Cache.Persist {
