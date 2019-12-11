@@ -1,6 +1,6 @@
 module github.com/BenB196/ip-api-proxy
 
-go 1.12
+go 1.13.5
 
 require (
 	github.com/BenB196/ip-api-go-pkg v0.0.7
