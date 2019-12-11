@@ -55,22 +55,6 @@ func main()  {
 	//404 everything else
 	http.HandleFunc("/",ipAIPProxy)
 
-	var clearCacheWg sync.WaitGroup
-
-	//Clear cache interval
-	clearCacheDuration,_ := time.ParseDuration(LoadedConfig.Cache.CleanInterval)
-	clearCacheTimeTicker := time.NewTicker(clearCacheDuration)
-	clearCacheWg.Add(1)
-	go func() {
-		for {
-			select {
-			case <-clearCacheTimeTicker.C:
-				go cache.CleanUpCache()
-			}
-			defer clearCacheWg.Done()
-		}
-	}()
-
 	//Write cache if persist is true
 	if LoadedConfig.Cache.Persist {
 		//read cache file on startup
@@ -221,7 +205,11 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//Check cache for ip
-		location, found := cache.GetLocation(ip + validatedLang,validatedFields)
+		location, found, err := cache.GetLocation(ip + validatedLang,validatedFields)
+
+		if err != nil {
+			panic(err)
+		}
 
 		//If ip found in cache return cached value
 		if found {
@@ -251,7 +239,8 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		//execute query
 		promMetrics.IncrementRequestsForwarded()
 		promMetrics.IncrementQueriesForwarded()
-		newLocation, err := ip_api.SingleQuery(query,key,"")
+		var newLocation ip_api.Location
+		newLocation, err = ip_api.SingleQuery(query,key,"")
 
 		if err != nil {
 			location.Status = "fail"
@@ -271,7 +260,10 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			promMetrics.IncrementHandlerRequests("200")
 			cache.AddLocation(ip + validatedLang,newLocation,cacheAge)
 			//Re-get request with specified fields
-			newLocation, _ = cache.GetLocation(ip + validatedLang,validatedFields)
+			newLocation, _, err = cache.GetLocation(ip + validatedLang,validatedFields)
+			if err != nil {
+				panic(err)
+			}
 			promMetrics.IncrementSuccessfulQueries()
 			promMetrics.IncrementSuccessfulSingeQueries()
 		}
@@ -504,13 +496,25 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					var found bool
 
 					if validatedSubFields != "" && validatedSubLang != "" {
-						location, found = cache.GetLocation(request.Query + validatedSubLang,validatedSubFields)
+						location, found, err = cache.GetLocation(request.Query + validatedSubLang,validatedSubFields)
+						if err != nil {
+							panic(err)
+						}
 					} else if validatedSubFields != "" {
-						location, found = cache.GetLocation(request.Query + validatedLang,validatedSubFields)
+						location, found, err = cache.GetLocation(request.Query + validatedLang,validatedSubFields)
+						if err != nil {
+							panic(err)
+						}
 					} else if validatedSubLang != "" {
-						location, found = cache.GetLocation(request.Query + validatedSubLang,validatedFields)
+						location, found, err = cache.GetLocation(request.Query + validatedSubLang,validatedFields)
+						if err != nil {
+							panic(err)
+						}
 					} else {
-						location, found = cache.GetLocation(request.Query + validatedLang,validatedFields)
+						location, found, err = cache.GetLocation(request.Query + validatedLang,validatedFields)
+						if err != nil {
+							panic(err)
+						}
 					}
 
 
@@ -602,7 +606,10 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 								fields = validatedFields
 							}
 
-							cachedLocation, _ := cache.GetLocation(location.Query+lang, fields)
+							cachedLocation, _, err := cache.GetLocation(location.Query+lang, fields)
+							if err != nil {
+								panic(err)
+							}
 							cachedNewLocations = append(cachedNewLocations, cachedLocation)
 							promMetrics.IncrementSuccessfulQueries()
 							promMetrics.IncrementSuccessfulBatchQueries()
