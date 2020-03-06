@@ -243,7 +243,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		promMetrics.IncrementRequestsForwarded()
 		promMetrics.IncrementQueriesForwarded()
 		var newLocation ip_api.Location
-		newLocation, err = ip_api.SingleQuery(query,key,"")
+		newLocation, err = ip_api.SingleQuery(query,key,"",LoadedConfig.Debugging)
 
 		if err != nil {
 			location.Status = "fail"
@@ -569,7 +569,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			//Execute batch request
 			var notCachedLocations []ip_api.Location
 			promMetrics.IncrementRequestsForwarded()
-			notCachedLocations, err = ip_api.BatchQuery(batchQuery,key,"")
+			notCachedLocations, err = ip_api.BatchQuery(batchQuery,key,"",LoadedConfig.Debugging)
 
 			if err != nil {
 				location.Status = "fail"

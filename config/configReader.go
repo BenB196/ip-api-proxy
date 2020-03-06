@@ -15,6 +15,7 @@ type Config struct {
 	Cache 		Cache 		`json:"cache,omitempty"`
 	APIKey		string		`json:"apiKey,omitempty"`
 	Port		int			`json:"port,omitempty"`
+	Debugging	bool		`json:"debugging,omitempty"`
 	Prometheus	Prometheus	`json:"prometheus,omitempty"`
 }
 

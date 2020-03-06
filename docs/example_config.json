@@ -7,6 +7,7 @@
   },
   "port": 8080,
   "apiKey": "",
+  "debugging": false,
   "prometheus": {
     "enabled": false
   }
