@@ -86,6 +86,7 @@ An example config file can be found [here](docs/example_config.json).
     "age": "24h"            #This is the age that a result is given, after which the result is marked as stale. Default: 24h
   },
   "port": 8080,             #This is the port which the application listens on. Default: 8080
+  "debugging": true,        #This is used to log queries for debugging purposes
   "apiKey": "",             #This is the API for using IP-API's pro API. Default: "", resorts to using the free API
   "prometheus": {
     "enabled": false        #This determines whether the Prometheus metrics endpoint is active. Default: false
