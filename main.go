@@ -242,7 +242,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		//execute query
 		promMetrics.IncrementRequestsForwarded()
 		promMetrics.IncrementQueriesForwarded()
-		var newLocation ip_api.Location
+		var newLocation *ip_api.Location
 		newLocation, err = ip_api.SingleQuery(query,key,"",LoadedConfig.Debugging)
 
 		if err != nil {
