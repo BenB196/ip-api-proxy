@@ -15,7 +15,7 @@ type Record struct {
 	Location		ip_api.Location	`json:"location"`
 }
 
-var FastCacheCache *fastcache.Cache
+var FastCacheCache = fastcache.New(32000000)
 
 /*
 GetLocation - function for getting the location of a query from cache
@@ -27,6 +27,12 @@ ip_api Location
 error
  */
 func GetLocation(query string, fields string) (*ip_api.Location, bool, error) {
+	//Check if cache has anything in it, skip if not
+	if FastCacheCache == nil {
+		//record not found in cache return false
+		return nil, false, nil
+	}
+
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 	queryBytes := []byte(query)
