@@ -262,7 +262,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		if newLocation.Status == "success" {
 			log.Println("Added: " + ip + validatedLang + " to cache.")
 			promMetrics.IncrementHandlerRequests("200")
-			_, err = cache.AddLocation(ip + validatedLang,newLocation,cacheAge)
+			_, err = cache.AddLocation(ip + validatedLang,*newLocation,cacheAge)
 			if err != nil {
 				log.Println(err)
 			}
@@ -505,7 +505,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					promMetrics.IncrementFailedBatchQueries()
 				} else {
 					//Check cache for ip
-					var location ip_api.Location
+					var location *ip_api.Location
 					var found bool
 
 					if validatedSubFields != "" && validatedSubLang != "" {
@@ -537,7 +537,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 						promMetrics.IncrementSuccessfulQueries()
 						promMetrics.IncrementSuccessfulBatchQueries()
 						log.Println("Found: " + request.Query + " in cache.")
-						cachedLocations = append(cachedLocations, location)
+						cachedLocations = append(cachedLocations, *location)
 					} else {
 						//if not found in cache add to not cache request list
 						promMetrics.IncrementQueriesForwarded()
@@ -628,7 +628,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								log.Println(err)
 							}
-							cachedNewLocations = append(cachedNewLocations, cachedLocation)
+							cachedNewLocations = append(cachedNewLocations, *cachedLocation)
 							promMetrics.IncrementSuccessfulQueries()
 							promMetrics.IncrementSuccessfulBatchQueries()
 						} else {

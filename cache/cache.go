@@ -26,7 +26,7 @@ returns
 ip_api Location
 error
  */
-func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
+func GetLocation(query string, fields string) (*ip_api.Location, bool, error) {
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 	queryBytes := []byte(query)
@@ -37,14 +37,14 @@ func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 		err := json.Unmarshal(recordBytes, &record)
 
 		if err != nil {
-			return ip_api.Location{}, false, err
+			return nil, false, err
 		}
 		//Check if record has not expired
 		if time.Now().In(loc).Sub(record.ExpirationTime) > 0 {
 			//Remove record if expired and return false
 			promMetrics.DecreaseQueriesCachedCurrent()
 			FastCacheCache.Del(queryBytes)
-			return ip_api.Location{}, false, nil
+			return nil, false, nil
 		}
 
 		location := ip_api.Location{}
@@ -56,7 +56,7 @@ func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ip_api.AllowedAPIFields) {
-			return record.Location, true, nil
+			return &record.Location, true, nil
 		} else {
 			fieldSlice := strings.Split(fields,",")
 			//Loop through fields and set selected fields
@@ -110,10 +110,10 @@ func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 			}
 		}
 		//Return location
-		return location, true, nil
+		return &location, true, nil
 	}
 	//record not found in cache return false
-	return ip_api.Location{}, false, nil
+	return nil, false, nil
 }
 
 /*
