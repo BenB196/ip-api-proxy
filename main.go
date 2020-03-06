@@ -148,6 +148,13 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		//get ecs value
+		ecs, ok := r.URL.Query()["ecs"]
+		var ecsBool = false
+		if len(ecs) > 0 {
+			ecsBool, _ = strconv.ParseBool(ecs[0])
+		}
+
 		//validate fields
 		var validatedFields string
 		if len(fields) > 0 {
@@ -362,6 +369,13 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write(jsonLocation)
 			return
+		}
+
+		//get ecs value
+		ecs, ok := r.URL.Query()["ecs"]
+		var ecsBool = false
+		if len(ecs) > 0 {
+			ecsBool, _ = strconv.ParseBool(ecs[0])
 		}
 
 		//validate fields
