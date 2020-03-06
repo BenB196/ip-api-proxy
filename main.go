@@ -77,7 +77,7 @@ func main()  {
 	}
 
 	//Listen on port
-	log.Println("Starting server...")
+	log.Println("Starting server on port " + strconv.Itoa(LoadedConfig.Port) + "...")
 	if err := http.ListenAndServe(":" + strconv.Itoa(LoadedConfig.Port),nil); err != nil {
 		log.Println(err)
 	}
