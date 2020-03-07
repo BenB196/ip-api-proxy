@@ -86,6 +86,7 @@ An example config file can be found [here](docs/example_config.json).
     "age": "24h"            #This is the age that a result is given, after which the result is marked as stale. Default: 24h
   },
   "port": 8080,             #This is the port which the application listens on. Default: 8080
+  "debugging": true,        #This is used to log queries for debugging purposes
   "apiKey": "",             #This is the API for using IP-API's pro API. Default: "", resorts to using the free API
   "prometheus": {
     "enabled": false        #This determines whether the Prometheus metrics endpoint is active. Default: false
@@ -166,5 +167,18 @@ ip_api_proxy_successful_queries_total 0
 # TYPE ip_api_proxy_successful_single_queries_total counter
 ip_api_proxy_successful_single_queries_total 0
 ```
+
+## Elastic Common Schema (ECS) Support
+
+Support for outputting IP-API results in the [ECS Standard](https://www.elastic.co/guide/en/ecs/current/ecs-geo.html) has been added. In order to get results in this format, when making queries against the API use ecs=false in the HTTP request:
+
+ex:
+```
+http://localhost:8080/batch?ecs=true
+```
+
+This will return an output that matches the [ECS Standard](https://www.elastic.co/guide/en/ecs/current/ecs-geo.html)
+
+Note: There are additional fields returned by IP-API, that are not listed under [ECS Standard](https://www.elastic.co/guide/en/ecs/current/ecs-geo.html), if you want to index these fields, please make sure you're index template is designed to handle them.
 
 If you have ideas for other metrics which you feel would be useful, please let me know.

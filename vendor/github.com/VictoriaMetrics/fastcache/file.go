@@ -118,7 +118,7 @@ func (c *Cache) save(dir string, workersCount int) error {
 	var err error
 	for i := 0; i < workersCount; i++ {
 		result := <-results
-		if result != nil && err != nil {
+		if result != nil && err == nil {
 			err = result
 		}
 	}
@@ -173,6 +173,16 @@ func load(filePath string, maxBytes int) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Initialize buckets, which could be missing due to incomplete or corrupted files in the cache.
+	// It is better initializing such buckets instead of returning error, since the rest of buckets
+	// contain valid data.
+	for i := range c.buckets[:] {
+		b := &c.buckets[i]
+		if len(b.chunks) == 0 {
+			b.chunks = make([][]byte, maxBucketChunks)
+			b.m = make(map[uint64]uint64)
+		}
+	}
 	return &c, nil
 }
 
@@ -204,6 +214,9 @@ func loadMetadata(dir string) (uint64, error) {
 	maxBucketChunks, err := readUint64(metadataFile)
 	if err != nil {
 		return 0, fmt.Errorf("cannot read maxBucketChunks from %q: %s", metadataPath, err)
+	}
+	if maxBucketChunks == 0 {
+		return 0, fmt.Errorf("invalid maxBucketChunks=0 read from %q", metadataPath)
 	}
 	return maxBucketChunks, nil
 }
@@ -359,10 +372,16 @@ func (b *bucket) Load(r io.Reader, maxChunks uint64) error {
 	}
 	for chunkIdx := uint64(0); chunkIdx < chunksLen; chunkIdx++ {
 		chunk := getChunk()
+		chunks[chunkIdx] = chunk
 		if _, err := io.ReadFull(r, chunk); err != nil {
+			// Free up allocated chunks before returning the error.
+			for _, chunk := range chunks {
+				if chunk != nil {
+					putChunk(chunk)
+				}
+			}
 			return fmt.Errorf("cannot read b.chunks[%d]: %s", chunkIdx, err)
 		}
-		chunks[chunkIdx] = chunk
 	}
 	// Adjust len for the chunk pointed by currChunkIdx.
 	if chunksLen > 0 {

@@ -77,7 +77,7 @@ func main()  {
 	}
 
 	//Listen on port
-	log.Println("Starting server...")
+	log.Println("Starting server on port " + strconv.Itoa(LoadedConfig.Port) + "...")
 	if err := http.ListenAndServe(":" + strconv.Itoa(LoadedConfig.Port),nil); err != nil {
 		log.Println(err)
 	}
@@ -146,6 +146,13 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write(jsonLocation)
 			return
+		}
+
+		//get ecs value
+		ecs, ok := r.URL.Query()["ecs"]
+		var ecsBool = false
+		if len(ecs) > 0 {
+			ecsBool, _ = strconv.ParseBool(ecs[0])
 		}
 
 		//validate fields
@@ -224,9 +231,41 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 			promMetrics.IncrementCacheHits()
 			promMetrics.IncrementSuccessfulQueries()
 			promMetrics.IncrementSuccessfulSingeQueries()
-			jsonLocation, _ := json.Marshal(location)
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(jsonLocation)
+			if !ecsBool {
+				jsonLocation, _ := json.Marshal(&location)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(jsonLocation)
+			} else {
+				ecsLocation := EcsLocation{
+					Status:        location.Status,
+					Message:       location.Message,
+					Continent:     location.Continent,
+					ContinentCode: location.ContinentCode,
+					Country:       location.Country,
+					CountryCode:   location.CountryCode,
+					Region:        location.Region,
+					RegionName:    location.RegionName,
+					City:          location.City,
+					District:      location.District,
+					ZIP:           location.ZIP,
+					Lat:           location.Lat,
+					Lon:           location.Lon,
+					Timezone:      location.Timezone,
+					Currency:      location.Currency,
+					ISP:           location.ISP,
+					Org:           location.Org,
+					AS:            location.AS,
+					ASName:        location.ASName,
+					Reverse:       location.Reverse,
+					Mobile:        location.Mobile,
+					Proxy:         location.Proxy,
+					Hosting:       location.Hosting,
+					Query:         location.Query,
+				}
+				jsonLocation, _ := json.Marshal(&ecsLocation)
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(jsonLocation)
+			}
 			return
 		}
 
@@ -242,8 +281,8 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		//execute query
 		promMetrics.IncrementRequestsForwarded()
 		promMetrics.IncrementQueriesForwarded()
-		var newLocation ip_api.Location
-		newLocation, err = ip_api.SingleQuery(query,key,"")
+		var newLocation *ip_api.Location
+		newLocation, err = ip_api.SingleQuery(query,key,"",LoadedConfig.Debugging)
 
 		if err != nil {
 			location.Status = "fail"
@@ -262,7 +301,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		if newLocation.Status == "success" {
 			log.Println("Added: " + ip + validatedLang + " to cache.")
 			promMetrics.IncrementHandlerRequests("200")
-			_, err = cache.AddLocation(ip + validatedLang,newLocation,cacheAge)
+			_, err = cache.AddLocation(ip + validatedLang,*newLocation,cacheAge)
 			if err != nil {
 				log.Println(err)
 			}
@@ -284,9 +323,41 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//return query
-		jsonLocation, _ := json.Marshal(&newLocation)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(jsonLocation)
+		if !ecsBool {
+			jsonLocation, _ := json.Marshal(&newLocation)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(jsonLocation)
+		} else {
+			ecsLocation := EcsLocation{
+				Status:        newLocation.Status,
+				Message:       newLocation.Message,
+				Continent:     newLocation.Continent,
+				ContinentCode: newLocation.ContinentCode,
+				Country:       newLocation.Country,
+				CountryCode:   newLocation.CountryCode,
+				Region:        newLocation.Region,
+				RegionName:    newLocation.RegionName,
+				City:          newLocation.City,
+				District:      newLocation.District,
+				ZIP:           newLocation.ZIP,
+				Lat:           newLocation.Lat,
+				Lon:           newLocation.Lon,
+				Timezone:      newLocation.Timezone,
+				Currency:      newLocation.Currency,
+				ISP:           newLocation.ISP,
+				Org:           newLocation.Org,
+				AS:            newLocation.AS,
+				ASName:        newLocation.ASName,
+				Reverse:       newLocation.Reverse,
+				Mobile:        newLocation.Mobile,
+				Proxy:         newLocation.Proxy,
+				Hosting:       newLocation.Hosting,
+				Query:         newLocation.Query,
+			}
+			jsonLocation, _ := json.Marshal(&ecsLocation)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(jsonLocation)
+		}
 		return
 	} else {
 		if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {
@@ -362,6 +433,13 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write(jsonLocation)
 			return
+		}
+
+		//get ecs value
+		ecs, ok := r.URL.Query()["ecs"]
+		var ecsBool = false
+		if len(ecs) > 0 {
+			ecsBool, _ = strconv.ParseBool(ecs[0])
 		}
 
 		//validate fields
@@ -457,9 +535,11 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 
 		//init slices
 		var cachedLocations []ip_api.Location
+		var cachedEcsLocations []EcsLocation
 		var notCachedRequests []ip_api.QueryIP
 		var notCachedRequestsMap = map[string]ip_api.QueryIP{}
 		var cachedNewLocations []ip_api.Location
+		var cachedNewEcsLocations []EcsLocation
 		//First check for any requests that are in cache. Only want to forward non-cached requests
 		var wg sync.WaitGroup
 		wg.Add(len(requests))
@@ -505,7 +585,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 					promMetrics.IncrementFailedBatchQueries()
 				} else {
 					//Check cache for ip
-					var location ip_api.Location
+					var location *ip_api.Location
 					var found bool
 
 					if validatedSubFields != "" && validatedSubLang != "" {
@@ -537,7 +617,37 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 						promMetrics.IncrementSuccessfulQueries()
 						promMetrics.IncrementSuccessfulBatchQueries()
 						log.Println("Found: " + request.Query + " in cache.")
-						cachedLocations = append(cachedLocations, location)
+						if !ecsBool {
+							cachedLocations = append(cachedLocations, *location)
+						} else {
+							ecsLocation := EcsLocation{
+								Status:        location.Status,
+								Message:       location.Message,
+								Continent:     location.Continent,
+								ContinentCode: location.ContinentCode,
+								Country:       location.Country,
+								CountryCode:   location.CountryCode,
+								Region:        location.Region,
+								RegionName:    location.RegionName,
+								City:          location.City,
+								District:      location.District,
+								ZIP:           location.ZIP,
+								Lat:           location.Lat,
+								Lon:           location.Lon,
+								Timezone:      location.Timezone,
+								Currency:      location.Currency,
+								ISP:           location.ISP,
+								Org:           location.Org,
+								AS:            location.AS,
+								ASName:        location.ASName,
+								Reverse:       location.Reverse,
+								Mobile:        location.Mobile,
+								Proxy:         location.Proxy,
+								Hosting:       location.Hosting,
+								Query:         location.Query,
+							}
+							cachedEcsLocations = append(cachedEcsLocations, ecsLocation)
+						}
 					} else {
 						//if not found in cache add to not cache request list
 						promMetrics.IncrementQueriesForwarded()
@@ -569,7 +679,7 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 			//Execute batch request
 			var notCachedLocations []ip_api.Location
 			promMetrics.IncrementRequestsForwarded()
-			notCachedLocations, err = ip_api.BatchQuery(batchQuery,key,"")
+			notCachedLocations, err = ip_api.BatchQuery(batchQuery,key,"",LoadedConfig.Debugging)
 
 			if err != nil {
 				location.Status = "fail"
@@ -628,11 +738,71 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							if err != nil {
 								log.Println(err)
 							}
-							cachedNewLocations = append(cachedNewLocations, cachedLocation)
+							if !ecsBool {
+								cachedNewLocations = append(cachedNewLocations, *cachedLocation)
+							} else {
+								ecsLocation := EcsLocation{
+									Status:        cachedLocation.Status,
+									Message:       cachedLocation.Message,
+									Continent:     cachedLocation.Continent,
+									ContinentCode: cachedLocation.ContinentCode,
+									Country:       cachedLocation.Country,
+									CountryCode:   cachedLocation.CountryCode,
+									Region:        cachedLocation.Region,
+									RegionName:    cachedLocation.RegionName,
+									City:          cachedLocation.City,
+									District:      cachedLocation.District,
+									ZIP:           cachedLocation.ZIP,
+									Lat:           cachedLocation.Lat,
+									Lon:           cachedLocation.Lon,
+									Timezone:      cachedLocation.Timezone,
+									Currency:      cachedLocation.Currency,
+									ISP:           cachedLocation.ISP,
+									Org:           cachedLocation.Org,
+									AS:            cachedLocation.AS,
+									ASName:        cachedLocation.ASName,
+									Reverse:       cachedLocation.Reverse,
+									Mobile:        cachedLocation.Mobile,
+									Proxy:         cachedLocation.Proxy,
+									Hosting:       cachedLocation.Hosting,
+									Query:         cachedLocation.Query,
+								}
+								cachedNewEcsLocations = append(cachedNewEcsLocations, ecsLocation)
+							}
 							promMetrics.IncrementSuccessfulQueries()
 							promMetrics.IncrementSuccessfulBatchQueries()
 						} else {
-							cachedNewLocations = append(cachedNewLocations, location)
+							if !ecsBool {
+								cachedNewLocations = append(cachedNewLocations, location)
+							} else {
+								ecsLocation := EcsLocation{
+									Status:        location.Status,
+									Message:       location.Message,
+									Continent:     location.Continent,
+									ContinentCode: location.ContinentCode,
+									Country:       location.Country,
+									CountryCode:   location.CountryCode,
+									Region:        location.Region,
+									RegionName:    location.RegionName,
+									City:          location.City,
+									District:      location.District,
+									ZIP:           location.ZIP,
+									Lat:           location.Lat,
+									Lon:           location.Lon,
+									Timezone:      location.Timezone,
+									Currency:      location.Currency,
+									ISP:           location.ISP,
+									Org:           location.Org,
+									AS:            location.AS,
+									ASName:        location.ASName,
+									Reverse:       location.Reverse,
+									Mobile:        location.Mobile,
+									Proxy:         location.Proxy,
+									Hosting:       location.Hosting,
+									Query:         location.Query,
+								}
+								cachedNewEcsLocations = append(cachedNewEcsLocations, ecsLocation)
+							}
 							log.Println("Failed query: " + location.Query)
 							promMetrics.IncrementFailedQueries()
 							promMetrics.IncrementFailedBatchQueries()
@@ -645,15 +815,29 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//Merge new requests with cached requests and return all
-		if len(cachedNewLocations) > 0 {
-			cachedLocations = append(cachedLocations, cachedNewLocations...)
+		if !ecsBool {
+			if len(cachedNewLocations) > 0 {
+				cachedLocations = append(cachedLocations, cachedNewLocations...)
+			}
+		} else {
+			if len(cachedNewEcsLocations) > 0 {
+				cachedEcsLocations = append(cachedEcsLocations, cachedNewEcsLocations...)
+			}
 		}
 
+
 		//return query
-		jsonLocation, _ := json.Marshal(cachedLocations)
-		promMetrics.IncrementHandlerRequests("200")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(jsonLocation)
+		if !ecsBool {
+			jsonLocation, _ := json.Marshal(cachedLocations)
+			promMetrics.IncrementHandlerRequests("200")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(jsonLocation)
+		} else {
+			jsonLocation, _ := json.Marshal(cachedEcsLocations)
+			promMetrics.IncrementHandlerRequests("200")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(jsonLocation)
+		}
 		return
 	} else {
 		if r.URL.Path != "/json/" && r.URL.Path != "/batch" && r.URL.Path != "/metrics" {

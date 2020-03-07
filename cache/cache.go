@@ -15,7 +15,7 @@ type Record struct {
 	Location		ip_api.Location	`json:"location"`
 }
 
-var FastCacheCache *fastcache.Cache
+var FastCacheCache = fastcache.New(32000000)
 
 /*
 GetLocation - function for getting the location of a query from cache
@@ -26,7 +26,13 @@ returns
 ip_api Location
 error
  */
-func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
+func GetLocation(query string, fields string) (*ip_api.Location, bool, error) {
+	//Check if cache has anything in it, skip if not
+	if FastCacheCache == nil {
+		//record not found in cache return false
+		return nil, false, nil
+	}
+
 	//Set timezone to UTC
 	loc, _ := time.LoadLocation("UTC")
 	queryBytes := []byte(query)
@@ -37,14 +43,14 @@ func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 		err := json.Unmarshal(recordBytes, &record)
 
 		if err != nil {
-			return ip_api.Location{}, false, err
+			return nil, false, err
 		}
 		//Check if record has not expired
 		if time.Now().In(loc).Sub(record.ExpirationTime) > 0 {
 			//Remove record if expired and return false
 			promMetrics.DecreaseQueriesCachedCurrent()
 			FastCacheCache.Del(queryBytes)
-			return ip_api.Location{}, false, nil
+			return nil, false, nil
 		}
 
 		location := ip_api.Location{}
@@ -56,7 +62,7 @@ func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 
 		//check if all fields are passed, if so just return location
 		if len(fields) == len(ip_api.AllowedAPIFields) {
-			return record.Location, true, nil
+			return &record.Location, true, nil
 		} else {
 			fieldSlice := strings.Split(fields,",")
 			//Loop through fields and set selected fields
@@ -104,16 +110,18 @@ func GetLocation(query string, fields string) (ip_api.Location, bool, error) {
 					location.Mobile = record.Location.Mobile
 				case "proxy":
 					location.Proxy = record.Location.Proxy
+				case "hosting":
+					location.Hosting = record.Location.Hosting
 				case "query":
 					location.Query = record.Location.Query
 				}
 			}
 		}
 		//Return location
-		return location, true, nil
+		return &location, true, nil
 	}
 	//record not found in cache return false
-	return ip_api.Location{}, false, nil
+	return nil, false, nil
 }
 
 /*
