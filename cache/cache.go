@@ -110,6 +110,8 @@ func GetLocation(query string, fields string) (*ip_api.Location, bool, error) {
 					location.Mobile = record.Location.Mobile
 				case "proxy":
 					location.Proxy = record.Location.Proxy
+				case "hosting":
+					location.Hosting = record.Location.Hosting
 				case "query":
 					location.Query = record.Location.Query
 				}
