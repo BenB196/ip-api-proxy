@@ -3,9 +3,9 @@ package main
 type EcsLocation struct {
 	Status 			string		`json:"status,omitempty"`
 	Message			string		`json:"message,omitempty"`
-	Continent		string		`json:"continent,omitempty"`
+	Continent		string		`json:"continent_name,omitempty"`
 	ContinentCode	string		`json:"continent_iso_code,omitempty"`
-	Country			string		`json:"country,omitempty"`
+	Country			string		`json:"country_name,omitempty"`
 	CountryCode		string		`json:"country_iso_code,omitempty"`
 	Region			string		`json:"region_iso_code,omitempty"`
 	RegionName		string		`json:"region_name,omitempty"`
@@ -19,7 +19,7 @@ type EcsLocation struct {
 	ISP				string		`json:"isp,omitempty"`
 	Org				string		`json:"org,omitempty"`
 	AS				string		`json:"as,omitempty"`
-	ASName			string		`json:"asname,omitempty"`
+	ASName			string		`json:"as_name,omitempty"`
 	Reverse			string		`json:"reverse,omitempty"`
 	Mobile			*bool		`json:"mobile,omitempty"`
 	Proxy			*bool		`json:"proxy,omitempty"`
