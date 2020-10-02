@@ -100,9 +100,6 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 	//init error
 	var err error
 
-	//Get cacheAge duration
-	cacheAge, _ := time.ParseDuration(LoadedConfig.Cache.Age)
-
 	if r.Method == "GET" {
 		//check to make sure that there are only 2 or less / in URL
 		if strings.Count(r.URL.Path,"/") > 2 {
@@ -301,7 +298,7 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		if newLocation.Status == "success" {
 			log.Println("Added: " + ip + validatedLang + " to cache.")
 			promMetrics.IncrementHandlerRequests("200")
-			_, err = cache.AddLocation(ip + validatedLang,*newLocation,cacheAge)
+			_, err = cache.AddLocation(ip + validatedLang,*newLocation,*LoadedConfig.Cache.SuccessAgeDuration)
 			if err != nil {
 				log.Println(err)
 			}
@@ -318,8 +315,18 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 		if newLocation.Status == "fail" {
 			log.Println("Failed single query: " + ip)
 			promMetrics.IncrementHandlerRequests("400")
+			_, err = cache.AddLocation(ip + validatedLang,*newLocation,*LoadedConfig.Cache.FailedAgeDuration)
+			if err != nil {
+				log.Println(err)
+			}
+			//Re-get request with specified fields
+			newLocation, _, err = cache.GetLocation(ip + validatedLang,validatedFields)
+			if err != nil {
+				log.Println(err)
+			}
 			promMetrics.IncrementFailedQueries()
 			promMetrics.IncrementFailedSingleQueries()
+
 		}
 
 		//return query
@@ -386,9 +393,6 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 
 	//init error
 	var err error
-
-	//Get cacheAge duration
-	cacheAge, _ := time.ParseDuration(LoadedConfig.Cache.Age)
 
 	if r.Method == "POST" {
 		//check to make sure that there are only 1 or less / in URL
@@ -719,12 +723,12 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							}
 
 							//Store non-cached location in cache and get back proper fields location
-							_, err = cache.AddLocation(location.Query+lang, location, cacheAge)
+							_, err = cache.AddLocation(location.Query+lang, location, *LoadedConfig.Cache.SuccessAgeDuration)
 							if err != nil {
 								log.Println(err)
 							}
 
-							log.Println("Added: " + location.Query + lang + " in cache.")
+							log.Println("Added Success: " + location.Query + lang + " in cache.")
 
 							//set fields value
 							var fields string
@@ -772,6 +776,27 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 							promMetrics.IncrementSuccessfulQueries()
 							promMetrics.IncrementSuccessfulBatchQueries()
 						} else {
+							//set lang value
+							var lang string
+							requestMap, ok := notCachedRequestsMap[location.Query]
+							if ok {
+								if requestMap.Lang != "" {
+									lang = requestMap.Lang
+								} else {
+									lang = validatedLang
+								}
+							} else {
+								lang = validatedLang
+							}
+
+							//Store non-cached location in cache and get back proper fields location
+							_, err = cache.AddLocation(location.Query+lang, location, *LoadedConfig.Cache.FailedAgeDuration)
+							if err != nil {
+								log.Println(err)
+							}
+
+							log.Println("Added Failed: " + location.Query + lang + " in cache.")
+
 							if !ecsBool {
 								cachedNewLocations = append(cachedNewLocations, location)
 							} else {

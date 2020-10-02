@@ -83,7 +83,8 @@ An example config file can be found [here](docs/example_config.json).
     "cleanInterval": "30m", #This is the interval that the proxy will go through and clean up any stale results from the cache which have expired. Default: 30m
     "writeInterval": "30m", #This is the interval that the cache is written to disk. Default: 30m, only works if persist == true.
     "writeLocation": "",    #This is the location where the cache will be written to disk. Defaul: working directory, only works if persist == true.
-    "age": "24h"            #This is the age that a result is given, after which the result is marked as stale. Default: 24h
+    "successAge": "24h",    #This is the age that a result is given for success, after which the result is marked as stale. Default: 24h
+    "failedAge": "30m"      #This is the age that a result is given for failed, after which the result is marked as stale. Default: 30m
   },
   "port": 8080,             #This is the port which the application listens on. Default: 8080
   "debugging": true,        #This is used to log queries for debugging purposes
