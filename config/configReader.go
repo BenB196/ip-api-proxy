@@ -12,26 +12,29 @@ import (
 )
 
 type Config struct {
-	Cache 		Cache 		`json:"cache,omitempty"`
-	APIKey		string		`json:"apiKey,omitempty"`
-	Port		int			`json:"port,omitempty"`
-	Debugging	bool		`json:"debugging,omitempty"`
-	Prometheus	Prometheus	`json:"prometheus,omitempty"`
+	Cache      Cache      `json:"cache,omitempty"`
+	APIKey     string     `json:"apiKey,omitempty"`
+	Port       int        `json:"port,omitempty"`
+	Debugging  bool       `json:"debugging,omitempty"`
+	Prometheus Prometheus `json:"prometheus,omitempty"`
 }
 
 type Cache struct {
-	Persist			bool	`json:"persist,omitempty"`
-	WriteInterval	string	`json:"writeInterval,omitempty"`
-	WriteLocation	string	`json:"writeLocation,omitempty"`
-	Age				string	`json:"age,omitempty"`
+	Persist            bool           `json:"persist,omitempty"`
+	WriteInterval      string         `json:"writeInterval,omitempty"`
+	WriteLocation      string         `json:"writeLocation,omitempty"`
+	SuccessAge         string         `json:"age,omitempty"`
+	SuccessAgeDuration *time.Duration `json:"success_age_duration,omitempty"`
+	FailedAge          string         `json:"failed_age,omitempty"`
+	FailedAgeDuration  *time.Duration `json:"failed_age_duration,omitempty"`
 }
 
 type Prometheus struct {
-	Enabled	bool	`json:"enabled,omitempty"`
-	Port	int		`json:"port,omitempty"`
+	Enabled bool `json:"enabled,omitempty"`
+	Port    int  `json:"port,omitempty"`
 }
 
-func ReadConfig(configLocation string) (Config,error) {
+func ReadConfig(configLocation string) (Config, error) {
 	var err error
 
 	//get working directory if no location passed
@@ -74,7 +77,7 @@ func ReadConfig(configLocation string) (Config,error) {
 		}
 
 		//unmarshal config with json
-		err = json.Unmarshal(fileData,&config)
+		err = json.Unmarshal(fileData, &config)
 
 		if err != nil {
 			return Config{}, errors.New("error: unmarshaling config file to json: " + err.Error())
@@ -132,15 +135,34 @@ func ReadConfig(configLocation string) (Config,error) {
 	}
 
 	//validate cache age
-	if config.Cache.Age != "" {
-		_, err := time.ParseDuration(config.Cache.Age)
+	if config.Cache.SuccessAge != "" {
+		successAgeDuration, err := time.ParseDuration(config.Cache.SuccessAge)
 
 		if err != nil {
-			return Config{}, errors.New("error: parsing age duration: " + err.Error())
+			return Config{}, errors.New("error: parsing success age duration: " + err.Error())
 		}
+
+		config.Cache.SuccessAgeDuration = &successAgeDuration
 	} else {
 		//set to default 24 hours
-		config.Cache.Age = "24h"
+		config.Cache.SuccessAge = "24h"
+		successAgeDuration := 24 * time.Hour
+		config.Cache.SuccessAgeDuration = &successAgeDuration
+	}
+
+	if config.Cache.FailedAge != "" {
+		failedAgeDuration, err := time.ParseDuration(config.Cache.FailedAge)
+
+		if err != nil {
+			return Config{}, errors.New("error: parsing failed age duration: " + err.Error())
+		}
+
+		config.Cache.FailedAgeDuration = &failedAgeDuration
+	} else {
+		//set to default 30 minutes
+		config.Cache.SuccessAge = "30m"
+		failedAgeDuration := 30 * time.Minute
+		config.Cache.FailedAgeDuration = &failedAgeDuration
 	}
 
 	//validate port
