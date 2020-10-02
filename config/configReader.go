@@ -23,10 +23,10 @@ type Cache struct {
 	Persist            bool           `json:"persist,omitempty"`
 	WriteInterval      string         `json:"writeInterval,omitempty"`
 	WriteLocation      string         `json:"writeLocation,omitempty"`
-	SuccessAge         string         `json:"age,omitempty"`
-	SuccessAgeDuration *time.Duration `json:"success_age_duration,omitempty"`
-	FailedAge          string         `json:"failed_age,omitempty"`
-	FailedAgeDuration  *time.Duration `json:"failed_age_duration,omitempty"`
+	SuccessAge         string         `json:"successAge,omitempty"`
+	SuccessAgeDuration *time.Duration `json:"successAgeDuration,omitempty"`
+	FailedAge          string         `json:"failedAge,omitempty"`
+	FailedAgeDuration  *time.Duration `json:"failedAgeDuration,omitempty"`
 }
 
 type Prometheus struct {
