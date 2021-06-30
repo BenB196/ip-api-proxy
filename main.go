@@ -223,7 +223,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 
 		//If ip found in cache return cached value
 		if found {
-			log.Println("Found: " + ip + " in cache.")
+			if LoadedConfig.Debugging {
+				log.Println("Found: " + ip + " in cache.")
+			}
 			promMetrics.IncrementHandlerRequests("200")
 			promMetrics.IncrementCacheHits()
 			promMetrics.IncrementSuccessfulQueries()
@@ -296,7 +298,9 @@ func ipAPIJson(w http.ResponseWriter, r *http.Request) {
 
 		//Add to cache if successful request
 		if newLocation.Status == "success" {
-			log.Println("Added: " + ip + validatedLang + " to cache.")
+			if LoadedConfig.Debugging {
+				log.Println("Added: " + ip + validatedLang + " to cache.")
+			}
 			promMetrics.IncrementHandlerRequests("200")
 			_, err = cache.AddLocation(ip + validatedLang,*newLocation,*LoadedConfig.Cache.SuccessAgeDuration)
 			if err != nil {
@@ -620,7 +624,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 						promMetrics.IncrementCacheHits()
 						promMetrics.IncrementSuccessfulQueries()
 						promMetrics.IncrementSuccessfulBatchQueries()
-						log.Println("Found: " + request.Query + " in cache.")
+						if LoadedConfig.Debugging {
+							log.Println("Found: " + request.Query + " in cache.")
+						}
 						if !ecsBool {
 							cachedLocations = append(cachedLocations, *location)
 						} else {
@@ -728,7 +734,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 								log.Println(err)
 							}
 
-							log.Println("Added Success: " + location.Query + lang + " in cache.")
+							if LoadedConfig.Debugging {
+								log.Println("Added Success: " + location.Query + lang + " in cache.")
+							}
 
 							//set fields value
 							var fields string
@@ -795,7 +803,9 @@ func ipAPIBatch(w http.ResponseWriter, r *http.Request) {
 								log.Println(err)
 							}
 
-							log.Println("Added Failed: " + location.Query + lang + " in cache.")
+							if LoadedConfig.Debugging {
+								log.Println("Added Failed: " + location.Query + lang + " in cache.")
+							}
 
 							if !ecsBool {
 								cachedNewLocations = append(cachedNewLocations, location)
